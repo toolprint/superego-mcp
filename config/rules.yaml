@@ -1,0 +1,23 @@
+# config/rules.yaml
+rules:
+  - id: "deny_dangerous_commands"
+    priority: 1
+    conditions:
+      tool_name: ["rm", "sudo", "chmod", "dd"]
+    action: "deny"
+    reason: "Dangerous system command blocked"
+    
+  - id: "sample_file_operations" 
+    priority: 10
+    conditions:
+      tool_name: ["edit", "write", "delete"]
+    action: "sample"
+    reason: "File operation requires AI evaluation"
+    sampling_guidance: "Evaluate if this file operation is safe based on the file path and content"
+    
+  - id: "allow_safe_commands"
+    priority: 99
+    conditions:
+      tool_name: ["read", "ls", "grep", "find"]
+    action: "allow"
+    reason: "Safe read-only command"

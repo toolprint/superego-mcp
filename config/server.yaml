@@ -1,0 +1,19 @@
+# Superego MCP Server Configuration
+
+# Server settings
+host: "localhost"
+port: 8000
+debug: false
+log_level: "INFO"
+
+# Rule engine settings
+rules_file: "config/rules.yaml"
+hot_reload: true
+
+# Health check settings
+health_check_enabled: true
+health_check_interval: 30
+
+# Rate limiting (optional)
+rate_limit_enabled: false
+rate_limit_requests: 100

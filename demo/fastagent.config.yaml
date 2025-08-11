@@ -1,0 +1,86 @@
+# FastAgent Configuration for Superego MCP Demo
+# This configures FastAgent to connect to our Superego MCP server via STDIO transport
+
+mcp:
+  servers:
+    superego:
+      # STDIO transport configuration for local MCP server
+      command: "uv"
+      args: ["run", "python", "-m", "superego_mcp.main"]
+      cwd: "."
+      env:
+        SUPEREGO_LOG_LEVEL: "INFO"
+        SUPEREGO_CONFIG_PATH: "./config"
+  
+  # Sampling configuration - use a local model for evaluation
+  sampling:
+    model: "claude-3-5-sonnet-20241022"  # Use Claude for sampling decisions
+    max_tokens: 2048
+    temperature: 0.1
+
+# Agent configuration
+agent:
+  name: "superego-security-demo"
+  description: "Demo agent showcasing Superego MCP server security evaluation"
+  
+  # System prompt for the agent
+  system_prompt: |
+    You are a security-aware demo agent that works with the Superego MCP security system.
+    
+    Your role is to demonstrate how AI tool requests are evaluated for security compliance.
+    When you need to use tools, the Superego MCP server will intercept and evaluate each request.
+    
+    Key behaviors:
+    1. Always explain what you're about to do before using tools
+    2. Show understanding of security implications  
+    3. Demonstrate various types of operations (safe, dangerous, complex)
+    4. Respect security decisions and explain why certain operations might be blocked
+    
+    Available operations to demonstrate:
+    - File operations: read_file, write_file, delete_file
+    - System operations: execute_command, change_permissions
+    - Network operations: fetch_url, send_request
+    - Search operations: search_files, grep_content
+    
+    Always be educational and explain security concepts to users.
+
+# Demo scenarios configuration
+demo:
+  scenarios:
+    safe_operations:
+      - name: "File Reading"
+        description: "Reading configuration files and documents"
+        examples:
+          - tool: "read_file"
+            params: {"path": "/home/user/config.yaml"}
+          - tool: "search_files"
+            params: {"pattern": "*.py", "directory": "/home/user/project"}
+    
+    dangerous_operations:
+      - name: "System Modification"
+        description: "Operations that modify system state"
+        examples:
+          - tool: "delete_file"
+            params: {"path": "/etc/passwd"}
+          - tool: "execute_command"
+            params: {"command": "sudo rm -rf /"}
+          - tool: "change_permissions"
+            params: {"path": "/etc/shadow", "mode": "777"}
+    
+    complex_operations:
+      - name: "Multi-step Operations"
+        description: "Operations requiring evaluation and approval"
+        examples:
+          - tool: "write_file"
+            params: {"path": "/tmp/script.sh", "content": "#!/bin/bash\necho 'Hello World'"}
+          - tool: "fetch_url"
+            params: {"url": "https://api.github.com/users/octocat", "method": "GET"}
+          - tool: "execute_command"
+            params: {"command": "python -c \"import os; print(os.listdir('/'))\""}
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  show_mcp_traffic: true
+  show_security_decisions: true
