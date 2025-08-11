@@ -9,8 +9,11 @@ from ..domain.models import ToolRequest
 from ..domain.security_policy import SecurityPolicyEngine
 from ..infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
 
-# Initialize FastMCP server
-mcp = FastMCP("Superego MCP Server")
+# Initialize FastMCP server with sampling support
+mcp = FastMCP(
+    name="Superego MCP Server",
+    instructions="Security evaluation and policy enforcement for AI agent tool usage with AI-based sampling support"
+)
 
 # Global components (will be injected)
 security_policy: SecurityPolicyEngine = None
@@ -119,6 +122,88 @@ async def get_health_status() -> str:
         return f"Error checking health: {str(e)}"
 
 
+@mcp.tool
+async def evaluate_tool_with_human_review(
+    tool_name: str,
+    parameters: dict,
+    session_id: str,
+    agent_id: str,
+    cwd: str,
+    human_justification: str,
+    ctx: Context,
+) -> dict:
+    """Evaluate tool request with additional human justification for sensitive operations"""
+    
+    try:
+        # Create domain model from request
+        request = ToolRequest(
+            tool_name=tool_name,
+            parameters=parameters,
+            session_id=session_id,
+            agent_id=agent_id,
+            cwd=cwd,
+        )
+
+        # Apply security policy evaluation
+        decision = await security_policy.evaluate(request)
+        
+        # Log the human justification along with the decision
+        audit_entry_data = {
+            "human_justification": human_justification,
+            "decision": decision.model_dump(),
+        }
+        
+        # Extract rule matches for audit trail
+        rule_matches = []
+        if decision.rule_id:
+            rule_matches.append(decision.rule_id)
+
+        # Log decision to audit trail with extra context
+        await audit_logger.log_decision(request, decision, rule_matches)
+
+        # Return MCP-compatible response with human review flag
+        return {
+            "action": decision.action,
+            "reason": decision.reason,
+            "confidence": decision.confidence,
+            "processing_time_ms": decision.processing_time_ms,
+            "rule_id": decision.rule_id,
+            "human_reviewed": True,
+            "ai_provider": decision.ai_provider,
+            "risk_factors": decision.risk_factors,
+        }
+
+    except Exception as e:
+        # Handle errors with centralized error handler
+        fallback_decision = error_handler.handle_error(e, request)
+
+        # Still log the fallback decision
+        await audit_logger.log_decision(request, fallback_decision, [])
+
+        return {
+            "action": fallback_decision.action,
+            "reason": fallback_decision.reason,
+            "confidence": fallback_decision.confidence,
+            "processing_time_ms": fallback_decision.processing_time_ms,
+            "error": True,
+            "human_reviewed": True,
+        }
+
+
+@mcp.resource("config://ai-sampling")
+async def get_ai_sampling_config() -> str:
+    """Expose current AI sampling configuration"""
+    try:
+        # Get AI service health from security policy
+        health_data = security_policy.health_check()
+        ai_config = health_data.get("ai_service", {})
+        
+        return json.dumps(ai_config, indent=2, default=str)
+        
+    except Exception as e:
+        return f"Error loading AI sampling config: {str(e)}"
+
+
 # Server startup and dependency injection
 async def create_server(
     security_policy_engine: SecurityPolicyEngine,
@@ -141,6 +226,7 @@ async def create_server(
 # Entry point for STDIO transport
 def run_stdio_server():
     """Run MCP server with STDIO transport for Claude Code"""
+    # FastMCP 2.0 automatically handles sampling requests when needed
     mcp.run(transport="stdio")
 
 

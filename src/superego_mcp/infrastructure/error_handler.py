@@ -180,10 +180,18 @@ class AuditLogger:
 
 
 class HealthMonitor:
-    """System health monitoring with component checks"""
+    """System health monitoring with component checks and configuration tracking"""
 
     def __init__(self) -> None:
         self.components: dict[str, Any] = {}
+        self.logger = structlog.get_logger(__name__)
+        self._config_reload_metrics = {
+            "total_reloads": 0,
+            "successful_reloads": 0,
+            "failed_reloads": 0,
+            "last_reload_time": None,
+            "last_reload_success": None,
+        }
 
     def register_component(self, name: str, component: Any) -> None:
         """Register component for health monitoring"""
@@ -195,9 +203,7 @@ class HealthMonitor:
 
         # Check each registered component
         for name, component in self.components.items():
-            if hasattr(component, "health_check") and callable(
-                component.health_check
-            ):
+            if hasattr(component, "health_check") and callable(component.health_check):
                 try:
                     health_check_method = component.health_check
                     # Check if it's a coroutine function
@@ -225,6 +231,11 @@ class HealthMonitor:
             "disk_usage_percent": psutil.disk_usage("/").percent,
         }
 
+        # Add configuration reload metrics
+        metrics.update({
+            "config_reload_metrics": self._config_reload_metrics.copy(),
+        })
+
         # Determine overall status
         overall_status = self._determine_overall_status(component_health)
 
@@ -248,3 +259,34 @@ class HealthMonitor:
             return "degraded"
         else:
             return "healthy"
+
+    def record_config_reload_attempt(self) -> None:
+        """Record a configuration reload attempt"""
+        import time
+        
+        self._config_reload_metrics["total_reloads"] += 1
+        self._config_reload_metrics["last_reload_time"] = time.time()
+
+    def record_config_reload_success(self) -> None:
+        """Record a successful configuration reload"""
+        self._config_reload_metrics["successful_reloads"] += 1
+        self._config_reload_metrics["last_reload_success"] = True
+
+    def record_config_reload_failure(self) -> None:
+        """Record a failed configuration reload"""
+        self._config_reload_metrics["failed_reloads"] += 1
+        self._config_reload_metrics["last_reload_success"] = False
+
+    def get_config_reload_success_rate(self) -> float:
+        """Get the configuration reload success rate"""
+        total = self._config_reload_metrics["total_reloads"]
+        if total == 0:
+            return 1.0  # No reloads attempted yet, assume healthy
+        
+        successful = self._config_reload_metrics["successful_reloads"]
+        return successful / total
+
+    def is_config_reload_healthy(self) -> bool:
+        """Check if configuration reloading is in a healthy state"""
+        success_rate = self.get_config_reload_success_rate()
+        return success_rate >= 0.8  # 80% success rate threshold

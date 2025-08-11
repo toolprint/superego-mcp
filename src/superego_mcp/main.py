@@ -1,44 +1,174 @@
 """Main entry point for Superego MCP Server."""
 
+import asyncio
 import logging
+import signal
+import sys
 from pathlib import Path
 
 from .domain.models import *
 from .domain.security_policy import SecurityPolicyEngine
+from .infrastructure.ai_service import AIServiceManager
+from .infrastructure.circuit_breaker import CircuitBreaker
+from .infrastructure.config import ConfigManager
+from .infrastructure.config_watcher import ConfigWatcher
 from .infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
+from .infrastructure.prompt_builder import SecurePromptBuilder
 
 
 def main():
-    """Main application bootstrap"""
-
+    """Main application bootstrap with hot-reload support"""
     # Setup logging
     logging.basicConfig(level=logging.INFO)
 
+    # Run the async main function
+    try:
+        asyncio.run(async_main())
+    except KeyboardInterrupt:
+        print("\nShutdown requested by user")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)
+
+
+async def async_main():
+    """Async main function with lifecycle management"""
+    # Load configuration
+    config_manager = ConfigManager()
+    config = config_manager.load_config()
+    
     # Initialize configuration paths
     config_dir = Path("config")
     rules_file = config_dir / "rules.yaml"
 
     # Create components
-    security_policy = SecurityPolicyEngine(rules_file)
     error_handler = ErrorHandler()
     audit_logger = AuditLogger()
     health_monitor = HealthMonitor()
+    
+    # Create AI components if enabled
+    ai_service_manager = None
+    prompt_builder = None
+    
+    if config.ai_sampling.enabled:
+        # Create circuit breaker for AI service
+        ai_circuit_breaker = CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=30,
+            timeout_seconds=config.ai_sampling.timeout_seconds
+        )
+        
+        # Create AI service manager
+        ai_service_manager = AIServiceManager(
+            config=config.ai_sampling,
+            circuit_breaker=ai_circuit_breaker
+        )
+        
+        # Create secure prompt builder
+        prompt_builder = SecurePromptBuilder()
+        
+        print(f"AI sampling enabled with primary provider: {config.ai_sampling.primary_provider}")
+    
+    # Create security policy with all dependencies
+    security_policy = SecurityPolicyEngine(
+        rules_file=rules_file,
+        health_monitor=health_monitor,
+        ai_service_manager=ai_service_manager,
+        prompt_builder=prompt_builder
+    )
+
+    # Create config watcher with reload callback
+    config_watcher = ConfigWatcher(
+        watch_path=rules_file,
+        reload_callback=security_policy.reload_rules,
+        debounce_seconds=1.0,
+    )
 
     # Register components for health monitoring
     health_monitor.register_component("security_policy", security_policy)
     health_monitor.register_component("audit_logger", audit_logger)
+    health_monitor.register_component("config_watcher", config_watcher)
 
-    print("Starting Superego MCP Server with STDIO transport...")
+    print("Starting Superego MCP Server with hot-reload support...")
 
-    # Set up global components for FastMCP
+    # Create multi-transport server
+    from .presentation.transport_server import MultiTransportServer
+
+    multi_transport_server = MultiTransportServer(
+        security_policy=security_policy,
+        audit_logger=audit_logger,
+        error_handler=error_handler,
+        health_monitor=health_monitor,
+        config=config,
+    )
+
+    # Setup graceful shutdown
+    shutdown_event = asyncio.Event()
+    
+    def signal_handler():
+        print("\nShutdown signal received...")
+        shutdown_event.set()
+
+    # Register signal handlers for graceful shutdown
+    for sig in [signal.SIGTERM, signal.SIGINT]:
+        signal.signal(sig, lambda s, f: signal_handler())
+
+    try:
+        # Start config watcher
+        await config_watcher.start()
+        
+        print("Configuration hot-reload enabled")
+        
+        # Log enabled transports
+        enabled_transports = []
+        if getattr(config, 'transport', None):
+            for transport_name, transport_config in config.transport.model_dump().items():
+                if transport_config.get('enabled', False) or transport_name == 'stdio':
+                    enabled_transports.append(transport_name.upper())
+        
+        print(f"Enabled transports: {', '.join(enabled_transports) if enabled_transports else 'STDIO only'}")
+        print("Server ready - press Ctrl+C to stop")
+
+        # Run server in a separate task to allow for graceful shutdown
+        server_task = asyncio.create_task(multi_transport_server.start())
+        shutdown_task = asyncio.create_task(shutdown_event.wait())
+
+        # Wait for either server completion or shutdown signal
+        done, pending = await asyncio.wait(
+            [server_task, shutdown_task],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+
+        # Cancel pending tasks
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    finally:
+        # Cleanup resources
+        print("Stopping multi-transport server...")
+        await multi_transport_server.stop()
+        
+        print("Stopping configuration watcher...")
+        await config_watcher.stop()
+        
+        # Cleanup AI service if initialized
+        if ai_service_manager:
+            print("Closing AI service connections...")
+            await ai_service_manager.close()
+        
+        print("Server shutdown complete")
+
+
+def run_server_with_stdio():
+    """Run the MCP server with STDIO transport"""
     from .presentation import mcp_server
-
-    mcp_server.security_policy = security_policy
-    mcp_server.audit_logger = audit_logger
-    mcp_server.error_handler = error_handler
-    mcp_server.health_monitor = health_monitor
-
-    # Run with STDIO transport
+    
+    # This will run synchronously and block
     mcp_server.run_stdio_server()
 
 

@@ -17,3 +17,42 @@ health_check_interval: 30
 # Rate limiting (optional)
 rate_limit_enabled: false
 rate_limit_requests: 100
+
+# AI Sampling Configuration
+ai_sampling:
+  enabled: true
+  primary_provider: "claude"
+  fallback_provider: "openai"
+  timeout_seconds: 10
+  cache_ttl_seconds: 300
+  max_concurrent_requests: 10
+  claude_model: "claude-3-sonnet-20240229"
+  openai_model: "gpt-4-turbo-preview"
+  temperature: 0.0
+
+# Multi-Transport Configuration
+transport:
+  stdio:
+    # STDIO transport is always enabled for CLI usage
+    enabled: true
+    
+  http:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8000
+    cors_origins: ["*"]
+    
+  websocket:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8001
+    cors_origins: ["*"]
+    ping_interval: 20
+    ping_timeout: 30
+    
+  sse:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8002
+    cors_origins: ["*"]
+    keepalive_interval: 30

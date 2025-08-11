@@ -6,6 +6,47 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from ..infrastructure.ai_service import AIProvider, SamplingConfig
+
+
+class TransportConfig(BaseModel):
+    """Individual transport configuration."""
+    
+    enabled: bool = Field(default=False, description="Enable this transport")
+    host: str = Field(default="0.0.0.0", description="Transport host address")
+    port: int = Field(description="Transport port")
+    cors_origins: list[str] = Field(default=["*"], description="CORS allowed origins")
+
+
+class HTTPTransportConfig(TransportConfig):
+    """HTTP transport configuration."""
+    
+    port: int = Field(default=8000, description="HTTP server port")
+
+
+class WebSocketTransportConfig(TransportConfig):
+    """WebSocket transport configuration."""
+    
+    port: int = Field(default=8001, description="WebSocket server port")
+    ping_interval: int = Field(default=20, description="WebSocket ping interval in seconds")
+    ping_timeout: int = Field(default=30, description="WebSocket ping timeout in seconds")
+
+
+class SSETransportConfig(TransportConfig):
+    """Server-Sent Events transport configuration."""
+    
+    port: int = Field(default=8002, description="SSE server port")
+    keepalive_interval: int = Field(default=30, description="Keepalive interval in seconds")
+
+
+class MultiTransportConfig(BaseModel):
+    """Multi-transport configuration."""
+    
+    stdio: dict[str, Any] = Field(default_factory=dict, description="STDIO transport config (always enabled)")
+    http: HTTPTransportConfig = Field(default_factory=HTTPTransportConfig, description="HTTP transport config")
+    websocket: WebSocketTransportConfig = Field(default_factory=WebSocketTransportConfig, description="WebSocket transport config")
+    sse: SSETransportConfig = Field(default_factory=SSETransportConfig, description="SSE transport config")
+
 
 class ServerConfig(BaseModel):
     """Server configuration model."""
@@ -29,6 +70,18 @@ class ServerConfig(BaseModel):
     rate_limit_enabled: bool = Field(default=False, description="Enable rate limiting")
     rate_limit_requests: int = Field(
         default=100, description="Requests per minute limit"
+    )
+    
+    # AI Sampling configuration
+    ai_sampling: SamplingConfig = Field(
+        default_factory=SamplingConfig,
+        description="AI sampling configuration"
+    )
+    
+    # Multi-transport configuration
+    transport: MultiTransportConfig = Field(
+        default_factory=MultiTransportConfig,
+        description="Multi-transport configuration"
     )
 
     class Config:
