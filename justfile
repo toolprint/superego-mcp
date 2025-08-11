@@ -155,3 +155,53 @@ update:
 security:
     @echo "Running security checks..."
     uv run pip-audit
+
+# Performance Tasks
+
+# Run server with performance optimizations
+run-optimized:
+    @echo "Starting Superego MCP Server with performance optimizations..."
+    uv run python -m superego_mcp.main_optimized
+
+# Run performance tests
+test-performance:
+    @echo "Running performance tests..."
+    uv run pytest tests/test_performance_optimization.py -v
+
+# Run load tests
+load-test:
+    @echo "Running load tests..."
+    @echo "Make sure server is running with: just run-optimized"
+    uv run python tests/load_test_performance.py
+
+# Run performance demo
+demo-performance:
+    @echo "Running performance optimization demo..."
+    @echo "Make sure server is running with: just run-optimized"
+    uv run python demo/performance_demo.py
+
+# Start monitoring dashboard only
+monitor:
+    @echo "Starting monitoring dashboard on http://localhost:9090/dashboard"
+    @echo "Metrics available at http://localhost:9090/metrics"
+    uv run python -c "from superego_mcp.presentation.monitoring import MonitoringDashboard; import asyncio; d = MonitoringDashboard(None, None, None); asyncio.run(d.start()); input('Press Enter to stop...')"
+
+# Multi-transport performance test
+test-multi-transport-perf:
+    @echo "Testing multi-transport performance..."
+    uv run python demo/multi_transport_demo.py --performance
+
+# Benchmark rule evaluation
+benchmark-rules:
+    @echo "Benchmarking rule evaluation performance..."
+    uv run python -m timeit -s "from superego_mcp.domain.models import ToolRequest; from superego_mcp.domain.security_policy import SecurityPolicyEngine; import asyncio; engine = SecurityPolicyEngine('config/rules.yaml'); request = ToolRequest(tool_name='ls', parameters={}, session_id='test', agent_id='test', cwd='/tmp')" "asyncio.run(engine.evaluate(request))"
+
+# Profile server performance
+profile:
+    @echo "Profiling server performance..."
+    uv run python -m cProfile -o profile.stats -m superego_mcp.main_optimized
+
+# Analyze profile results
+profile-analyze:
+    @echo "Analyzing profile results..."
+    uv run python -m pstats profile.stats

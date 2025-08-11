@@ -56,3 +56,38 @@ transport:
     port: 8002
     cors_origins: ["*"]
     keepalive_interval: 30
+
+# Performance Optimization Configuration
+performance:
+  metrics_enabled: true
+  metrics_port: 9090
+  
+  # Request queue configuration
+  request_queue:
+    max_size: 1000
+    timeout_seconds: 30
+    ai_sampling_concurrency: 10
+    enable_backpressure: true
+    
+  # Connection pooling configuration
+  connection_pooling:
+    max_connections: 100
+    max_keepalive_connections: 20
+    keepalive_timeout: 30
+    
+  # Response caching configuration
+  caching:
+    response_cache_ttl: 300
+    pattern_cache_size: 1000
+    enable_compression: true
+    
+  # Memory optimization
+  memory:
+    object_pool_size: 100
+    intern_strings: true
+    
+  # Request batching
+  batching:
+    enabled: true
+    batch_size: 10
+    batch_timeout: 0.5
