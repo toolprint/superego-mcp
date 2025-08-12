@@ -1,16 +1,12 @@
 """Integration tests for security policy engine with AI sampling."""
 
-import asyncio
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yaml
 
 from superego_mcp.domain.models import (
-    SecurityRule,
     SuperegoError,
-    ToolAction,
     ToolRequest,
 )
 from superego_mcp.domain.security_policy import SecurityPolicyEngine
@@ -18,7 +14,6 @@ from superego_mcp.infrastructure.ai_service import (
     AIDecision,
     AIProvider,
     AIServiceManager,
-    SamplingConfig,
 )
 from superego_mcp.infrastructure.prompt_builder import SecurePromptBuilder
 
@@ -369,7 +364,7 @@ class TestSecurityPolicyWithAI:
         )
 
         # Evaluate
-        decision = await engine.evaluate(request)
+        await engine.evaluate(request)
 
         # Verify prompt was built and sanitized
         call_args = mock_ai_service_manager.evaluate_with_ai.call_args

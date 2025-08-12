@@ -1,11 +1,10 @@
 """HTTP transport implementation for Superego MCP Server."""
 
 import asyncio
-import json
 from typing import Any
 
 import structlog
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastmcp import FastMCP
@@ -65,6 +64,7 @@ class HTTPTransport:
         self.error_handler = error_handler
         self.health_monitor = health_monitor
         self.config = config
+        self.server: Server | None = None
 
         # Create FastAPI app
         self.app = FastAPI(
@@ -164,7 +164,7 @@ class HTTPTransport:
                 )
             except Exception as e:
                 logger.error("HTTP: Health check failed", error=str(e))
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail=str(e)) from None
 
         @self.app.get("/v1/config/rules")
         async def get_current_rules() -> dict[str, Any]:
@@ -192,7 +192,7 @@ class HTTPTransport:
                 return rules_data
             except Exception as e:
                 logger.error("HTTP: Failed to get rules", error=str(e))
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail=str(e)) from None
 
         @self.app.get("/v1/audit/recent")
         async def get_recent_audit_entries() -> dict[str, Any]:
@@ -213,7 +213,7 @@ class HTTPTransport:
                 return audit_data
             except Exception as e:
                 logger.error("HTTP: Failed to get audit entries", error=str(e))
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail=str(e)) from None
 
         @self.app.get("/v1/metrics")
         async def get_metrics() -> dict[str, Any]:
@@ -239,7 +239,7 @@ class HTTPTransport:
                 return metrics
             except Exception as e:
                 logger.error("HTTP: Failed to get metrics", error=str(e))
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail=str(e)) from None
 
         @self.app.get("/v1/server-info")
         async def get_server_info() -> dict[str, Any]:
@@ -271,7 +271,9 @@ class HTTPTransport:
 
         # Global exception handler
         @self.app.exception_handler(Exception)
-        async def global_exception_handler(request, exc):
+        async def global_exception_handler(
+            request: Request, exc: Exception
+        ) -> JSONResponse:
             """Global exception handler for unhandled errors."""
             logger.error(
                 "HTTP: Unhandled exception", error=str(exc), path=str(request.url)
@@ -301,10 +303,11 @@ class HTTPTransport:
         )
 
         # Create server
-        self.server = Server(config)
+        server = Server(config)
+        self.server = server
 
         try:
-            await self.server.serve()
+            await server.serve()
         except Exception as e:
             logger.error("HTTP transport failed", error=str(e))
             raise

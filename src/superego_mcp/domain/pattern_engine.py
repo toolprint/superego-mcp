@@ -1,16 +1,14 @@
 """Advanced pattern matching engine for security rules with caching optimization."""
 
-import re
 import fnmatch
-import time
-from datetime import datetime, time as dt_time
+import re
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Union, TYPE_CHECKING
-from functools import lru_cache
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from jsonpath_ng import parse as jsonpath_parse
 from dateutil import tz
+from jsonpath_ng import parse as jsonpath_parse  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from .models import ToolRequest
@@ -28,28 +26,54 @@ class PatternType(str, Enum):
 class PatternEngine:
     """Unified pattern matching engine with performance optimization."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = structlog.get_logger(__name__)
-        self._compiled_patterns: Dict[str, Any] = {}
+        self._compiled_patterns: dict[str, Any] = {}
+        # Use instance-level caches instead of @lru_cache to avoid memory leaks
+        self._regex_cache: dict[str, re.Pattern] = {}
+        self._jsonpath_cache: dict[str, Any] = {}
+        self._max_cache_size = 256
 
-    @lru_cache(maxsize=256)
     def _compile_regex(self, pattern: str) -> re.Pattern:
         """Compile and cache regex patterns."""
+        if pattern in self._regex_cache:
+            return self._regex_cache[pattern]
+
         try:
             # Add safety limits to prevent catastrophic backtracking
             if len(pattern) > 1000:
                 raise ValueError("Regex pattern too long")
-            return re.compile(pattern, re.IGNORECASE)
-        except re.error as e:
-            raise ValueError(f"Invalid regex pattern: {e}")
+            compiled = re.compile(pattern, re.IGNORECASE)
 
-    @lru_cache(maxsize=256)
+            # Simple LRU: remove oldest if cache is full
+            if len(self._regex_cache) >= self._max_cache_size:
+                # Remove first (oldest) item
+                oldest_key = next(iter(self._regex_cache))
+                del self._regex_cache[oldest_key]
+
+            self._regex_cache[pattern] = compiled
+            return compiled
+        except re.error as e:
+            raise ValueError(f"Invalid regex pattern: {e}") from e
+
     def _compile_jsonpath(self, pattern: str) -> Any:
         """Compile and cache JSONPath expressions."""
+        if pattern in self._jsonpath_cache:
+            return self._jsonpath_cache[pattern]
+
         try:
-            return jsonpath_parse(pattern)
+            compiled = jsonpath_parse(pattern)
+
+            # Simple LRU: remove oldest if cache is full
+            if len(self._jsonpath_cache) >= self._max_cache_size:
+                # Remove first (oldest) item
+                oldest_key = next(iter(self._jsonpath_cache))
+                del self._jsonpath_cache[oldest_key]
+
+            self._jsonpath_cache[pattern] = compiled
+            return compiled
         except Exception as e:
-            raise ValueError(f"Invalid JSONPath pattern: {e}")
+            raise ValueError(f"Invalid JSONPath pattern: {e}") from e
 
     def match_string(self, pattern: str, value: str) -> bool:
         """Simple string equality matching."""
@@ -96,29 +120,29 @@ class PatternEngine:
                 value = match.value
                 if (
                     comparison == "gt"
-                    and isinstance(value, (int, float))
-                    and isinstance(threshold, (int, float))
+                    and isinstance(value, int | float)
+                    and isinstance(threshold, int | float)
                 ):
                     if value > threshold:
                         return True
                 elif (
                     comparison == "gte"
-                    and isinstance(value, (int, float))
-                    and isinstance(threshold, (int, float))
+                    and isinstance(value, int | float)
+                    and isinstance(threshold, int | float)
                 ):
                     if value >= threshold:
                         return True
                 elif (
                     comparison == "lt"
-                    and isinstance(value, (int, float))
-                    and isinstance(threshold, (int, float))
+                    and isinstance(value, int | float)
+                    and isinstance(threshold, int | float)
                 ):
                     if value < threshold:
                         return True
                 elif (
                     comparison == "lte"
-                    and isinstance(value, (int, float))
-                    and isinstance(threshold, (int, float))
+                    and isinstance(value, int | float)
+                    and isinstance(threshold, int | float)
                 ):
                     if value <= threshold:
                         return True
@@ -134,7 +158,10 @@ class PatternEngine:
             return False
 
     def match_pattern(
-        self, pattern_config: Union[str, dict], value: Any, context: dict = None
+        self,
+        pattern_config: str | dict,
+        value: Any,
+        context: dict[Any, Any] | None = None,
     ) -> bool:
         """
         Match a pattern configuration against a value.
@@ -291,7 +318,7 @@ class PatternEngine:
             )
             return False
 
-    def validate_pattern(self, pattern_config: Union[str, dict]) -> bool:
+    def validate_pattern(self, pattern_config: str | dict) -> bool:
         """Validate a pattern configuration without executing it."""
         try:
             if isinstance(pattern_config, str):
@@ -319,26 +346,19 @@ class PatternEngine:
 
     def get_cache_stats(self) -> dict:
         """Get pattern compilation cache statistics."""
-        regex_cache = self._compile_regex.cache_info()
-        jsonpath_cache = self._compile_jsonpath.cache_info()
-
         return {
             "regex_cache": {
-                "hits": regex_cache.hits,
-                "misses": regex_cache.misses,
-                "maxsize": regex_cache.maxsize,
-                "currsize": regex_cache.currsize,
+                "maxsize": self._max_cache_size,
+                "currsize": len(self._regex_cache),
             },
             "jsonpath_cache": {
-                "hits": jsonpath_cache.hits,
-                "misses": jsonpath_cache.misses,
-                "maxsize": jsonpath_cache.maxsize,
-                "currsize": jsonpath_cache.currsize,
+                "maxsize": self._max_cache_size,
+                "currsize": len(self._jsonpath_cache),
             },
         }
 
     def clear_cache(self) -> None:
         """Clear pattern compilation caches."""
-        self._compile_regex.cache_clear()
-        self._compile_jsonpath.cache_clear()
+        self._regex_cache.clear()
+        self._jsonpath_cache.clear()
         self._compiled_patterns.clear()

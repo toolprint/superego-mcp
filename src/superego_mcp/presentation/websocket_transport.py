@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from typing import Any, Dict, Set
+from typing import Any
 
 import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -38,10 +38,10 @@ class WSResponse(BaseModel):
 class ConnectionManager:
     """Manages WebSocket connections."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize connection manager."""
-        self.active_connections: Set[WebSocket] = set()
-        self.subscriptions: Dict[str, Set[WebSocket]] = {
+        self.active_connections: set[WebSocket] = set()
+        self.subscriptions: dict[str, set[WebSocket]] = {
             "health": set(),
             "audit": set(),
             "config": set(),
@@ -164,10 +164,10 @@ class WebSocketTransport:
         )
 
         # Server instance
-        self.server = None
+        self.server: Server | None = None
 
         # Background tasks
-        self.heartbeat_task = None
+        self.heartbeat_task: asyncio.Task[None] | None = None
 
         self._setup_routes()
 
@@ -175,7 +175,7 @@ class WebSocketTransport:
         """Set up WebSocket routes."""
 
         @self.app.websocket("/v1/ws")
-        async def websocket_endpoint(websocket: WebSocket):
+        async def websocket_endpoint(websocket: WebSocket) -> None:
             """Main WebSocket endpoint for MCP communication."""
             await self.connection_manager.connect(websocket)
 
@@ -459,7 +459,8 @@ class WebSocketTransport:
         logger.info("Starting WebSocket transport", host=host, port=port)
 
         # Start heartbeat task
-        self.heartbeat_task = asyncio.create_task(self._start_heartbeat())
+        heartbeat_task = asyncio.create_task(self._start_heartbeat())
+        self.heartbeat_task = heartbeat_task
 
         # Create uvicorn config
         config = Config(
@@ -472,10 +473,11 @@ class WebSocketTransport:
         )
 
         # Create server
-        self.server = Server(config)
+        server = Server(config)
+        self.server = server
 
         try:
-            await self.server.serve()
+            await server.serve()
         except Exception as e:
             logger.error("WebSocket transport failed", error=str(e))
             raise
@@ -490,7 +492,7 @@ class WebSocketTransport:
                 self.heartbeat_task.cancel()
                 try:
                     await asyncio.wait_for(self.heartbeat_task, timeout=2.0)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
+                except (TimeoutError, asyncio.CancelledError):
                     logger.debug("Heartbeat task cancelled successfully")
                 except Exception as e:
                     logger.warning("Error stopping heartbeat task", error=str(e))

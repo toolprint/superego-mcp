@@ -5,7 +5,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import psutil
 import structlog
@@ -26,13 +26,13 @@ class MetricValue:
 
     value: float
     timestamp: float = field(default_factory=time.time)
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
 
 
 class MetricsCollector:
     """Comprehensive metrics collection with Prometheus format support."""
 
-    def __init__(self, registry: Optional[CollectorRegistry] = None):
+    def __init__(self, registry: CollectorRegistry | None = None):
         """Initialize metrics collector.
 
         Args:
@@ -45,7 +45,7 @@ class MetricsCollector:
         self._setup_prometheus_metrics()
 
         # Internal storage for custom metrics
-        self._custom_metrics: Dict[str, List[MetricValue]] = defaultdict(list)
+        self._custom_metrics: dict[str, list[MetricValue]] = defaultdict(list)
         self._lock = asyncio.Lock()
 
     def _setup_prometheus_metrics(self) -> None:
@@ -203,7 +203,7 @@ class MetricsCollector:
         ).observe(duration)
 
     async def record_security_evaluation(
-        self, action: str, rule_id: Optional[str], duration: float
+        self, action: str, rule_id: str | None, duration: float
     ) -> None:
         """Record security evaluation metrics.
 
@@ -244,7 +244,7 @@ class MetricsCollector:
             self.circuit_breaker_failures.labels(service=service).inc(failures)
 
     async def update_queue_metrics(
-        self, queue_name: str, size: int, wait_time: Optional[float] = None
+        self, queue_name: str, size: int, wait_time: float | None = None
     ) -> None:
         """Update queue metrics.
 
@@ -314,7 +314,7 @@ class MetricsCollector:
         elif transport == "sse":
             self.sse_clients_active.dec()
 
-    def track_request(self, transport: str) -> Callable:
+    def track_request(self, transport: str) -> Any:
         """Context manager to track in-flight requests.
 
         Args:
@@ -329,17 +329,17 @@ class MetricsCollector:
                 self.gauge = gauge
                 self.transport = transport
 
-            def __enter__(self):
+            def __enter__(self) -> "RequestTracker":
                 self.gauge.labels(transport=self.transport).inc()
                 return self
 
-            def __exit__(self, exc_type, exc_val, exc_tb):
+            def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
                 self.gauge.labels(transport=self.transport).dec()
 
         return RequestTracker(self.requests_in_flight, transport)
 
     async def record_custom_metric(
-        self, name: str, value: float, labels: Optional[Dict[str, str]] = None
+        self, name: str, value: float, labels: dict[str, str] | None = None
     ) -> None:
         """Record a custom metric value.
 
@@ -356,7 +356,7 @@ class MetricsCollector:
             if len(self._custom_metrics[name]) > 1000:
                 self._custom_metrics[name] = self._custom_metrics[name][-1000:]
 
-    async def get_custom_metrics(self) -> Dict[str, List[MetricValue]]:
+    async def get_custom_metrics(self) -> dict[str, list[MetricValue]]:
         """Get all custom metrics.
 
         Returns:
@@ -373,7 +373,7 @@ class MetricsCollector:
         """
         return generate_latest(self.registry)
 
-    async def get_metrics_summary(self) -> Dict[str, Any]:
+    async def get_metrics_summary(self) -> dict[str, Any]:
         """Get a summary of all metrics.
 
         Returns:
@@ -402,8 +402,8 @@ class MetricsCollector:
         return summary
 
     async def calculate_percentiles(
-        self, metric_name: str, percentiles: List[int] = [50, 90, 95, 99]
-    ) -> Dict[int, float]:
+        self, metric_name: str, percentiles: list[int] | None = None
+    ) -> dict[int, float]:
         """Calculate percentiles for a custom metric.
 
         Args:
@@ -413,10 +413,12 @@ class MetricsCollector:
         Returns:
             Dictionary of percentile to value
         """
+        if percentiles is None:
+            percentiles = [50, 90, 95, 99]
         async with self._lock:
             values = self._custom_metrics.get(metric_name, [])
             if not values:
-                return {p: 0.0 for p in percentiles}
+                return dict.fromkeys(percentiles, 0.0)
 
             sorted_values = sorted(v.value for v in values)
             result = {}

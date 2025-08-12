@@ -10,16 +10,16 @@ from ..domain.security_policy import SecurityPolicyEngine
 from ..infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
 
 # Initialize FastMCP server with sampling support
-mcp = FastMCP(
+mcp: FastMCP = FastMCP(
     name="Superego MCP Server",
     instructions="Security evaluation and policy enforcement for AI agent tool usage with AI-based sampling support",
 )
 
 # Global components (will be injected)
-security_policy: SecurityPolicyEngine = None
-audit_logger: AuditLogger = None
-error_handler: ErrorHandler = None
-health_monitor: HealthMonitor = None
+security_policy: SecurityPolicyEngine | None = None
+audit_logger: AuditLogger | None = None
+error_handler: ErrorHandler | None = None
+health_monitor: HealthMonitor | None = None
 
 
 @mcp.tool
@@ -44,6 +44,8 @@ async def evaluate_tool_request(
         )
 
         # Apply security policy evaluation
+        if security_policy is None:
+            raise RuntimeError("Security policy engine not initialized")
         decision = await security_policy.evaluate(request)
 
         # Extract rule matches for audit trail
@@ -52,6 +54,8 @@ async def evaluate_tool_request(
             rule_matches.append(decision.rule_id)
 
         # Log decision to audit trail
+        if audit_logger is None:
+            raise RuntimeError("Audit logger not initialized")
         await audit_logger.log_decision(request, decision, rule_matches)
 
         # Return MCP-compatible response
@@ -65,9 +69,13 @@ async def evaluate_tool_request(
 
     except Exception as e:
         # Handle errors with centralized error handler
+        if error_handler is None:
+            raise RuntimeError("Error handler not initialized") from e
         fallback_decision = error_handler.handle_error(e, request)
 
         # Still log the fallback decision
+        if audit_logger is None:
+            raise RuntimeError("Audit logger not initialized") from e
         await audit_logger.log_decision(request, fallback_decision, [])
 
         return {
@@ -84,6 +92,8 @@ async def get_current_rules() -> str:
     """Expose current security rules as MCP resource"""
     try:
         # Read current rules from file and serialize safely
+        if security_policy is None:
+            raise RuntimeError("Security policy engine not initialized")
         rules_data = {
             "rules": [rule.model_dump(mode="json") for rule in security_policy.rules],
             "total_rules": len(security_policy.rules),
@@ -99,6 +109,8 @@ async def get_current_rules() -> str:
 async def get_recent_audit_entries() -> str:
     """Expose recent audit entries for monitoring"""
     try:
+        if audit_logger is None:
+            raise RuntimeError("Audit logger not initialized")
         entries = audit_logger.get_recent_entries(limit=50)
         audit_data = {
             "entries": [entry.model_dump(mode="json") for entry in entries],
@@ -115,6 +127,8 @@ async def get_health_status() -> str:
     """Expose system health status"""
     try:
         # Health check will be injected from main
+        if health_monitor is None:
+            raise RuntimeError("Health monitor not initialized")
         health_status = await health_monitor.check_health()
         return json.dumps(health_status.model_dump(mode="json"), indent=2, default=str)
 
@@ -145,10 +159,12 @@ async def evaluate_tool_with_human_review(
         )
 
         # Apply security policy evaluation
+        if security_policy is None:
+            raise RuntimeError("Security policy engine not initialized")
         decision = await security_policy.evaluate(request)
 
         # Log the human justification along with the decision
-        audit_entry_data = {
+        {
             "human_justification": human_justification,
             "decision": decision.model_dump(),
         }
@@ -159,6 +175,8 @@ async def evaluate_tool_with_human_review(
             rule_matches.append(decision.rule_id)
 
         # Log decision to audit trail with extra context
+        if audit_logger is None:
+            raise RuntimeError("Audit logger not initialized")
         await audit_logger.log_decision(request, decision, rule_matches)
 
         # Return MCP-compatible response with human review flag
@@ -175,9 +193,13 @@ async def evaluate_tool_with_human_review(
 
     except Exception as e:
         # Handle errors with centralized error handler
+        if error_handler is None:
+            raise RuntimeError("Error handler not initialized") from e
         fallback_decision = error_handler.handle_error(e, request)
 
         # Still log the fallback decision
+        if audit_logger is None:
+            raise RuntimeError("Audit logger not initialized") from e
         await audit_logger.log_decision(request, fallback_decision, [])
 
         return {
@@ -195,6 +217,8 @@ async def get_ai_sampling_config() -> str:
     """Expose current AI sampling configuration"""
     try:
         # Get AI service health from security policy
+        if security_policy is None:
+            raise RuntimeError("Security policy engine not initialized")
         health_data = security_policy.health_check()
         ai_config = health_data.get("ai_service", {})
 
@@ -224,7 +248,7 @@ async def create_server(
 
 
 # Entry point for STDIO transport
-def run_stdio_server():
+def run_stdio_server() -> None:
     """Run MCP server with STDIO transport for Claude Code"""
     # FastMCP 2.0 automatically handles sampling requests when needed
     mcp.run(transport="stdio")

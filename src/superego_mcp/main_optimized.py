@@ -6,7 +6,6 @@ import signal
 import sys
 from pathlib import Path
 
-from .domain.models import *
 from .domain.security_policy_optimized import OptimizedSecurityPolicyEngine
 from .infrastructure.ai_service_optimized import OptimizedAIServiceManager
 from .infrastructure.circuit_breaker import CircuitBreaker
@@ -24,7 +23,7 @@ from .infrastructure.request_queue import RequestQueue
 from .presentation.monitoring import AlertManager, MonitoringDashboard
 
 
-def main():
+def main() -> None:
     """Main application bootstrap with performance optimizations"""
     # Setup logging
     logging.basicConfig(level=logging.INFO)
@@ -40,7 +39,7 @@ def main():
         sys.exit(1)
 
 
-async def async_main():
+async def async_main() -> None:
     """Async main function with lifecycle management and performance enhancements"""
     # Load configuration
     config_manager = ConfigManager()
@@ -111,7 +110,7 @@ async def async_main():
 
         # Start request queue if created
         if request_queue:
-            await request_queue.start(ai_service_manager._evaluate_direct)
+            await request_queue.start(ai_service_manager._evaluate_direct)  # type: ignore[arg-type]
 
         print(
             f"AI sampling enabled with primary provider: {config.ai_sampling.primary_provider}"
@@ -182,7 +181,7 @@ async def async_main():
     # Setup graceful shutdown
     shutdown_event = asyncio.Event()
 
-    def signal_handler():
+    def signal_handler() -> None:
         print("\nShutdown signal received...")
         shutdown_event.set()
 
@@ -194,7 +193,7 @@ async def async_main():
     background_tasks = []
 
     # Periodic metrics collection
-    async def collect_metrics():
+    async def collect_metrics() -> None:
         while not shutdown_event.is_set():
             await metrics_collector.collect_system_metrics()
 
@@ -321,12 +320,12 @@ async def async_main():
         print("Server shutdown complete")
 
 
-def run_optimized_server():
+def run_optimized_server() -> None:
     """Run the optimized MCP server"""
     main()
 
 
-def cli_main():
+def cli_main() -> None:
     """CLI entry point for the optimized server."""
     main()
 

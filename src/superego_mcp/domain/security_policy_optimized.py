@@ -2,14 +2,19 @@
 
 import hashlib
 import time
-from typing import Optional
 
 import structlog
 
-from ..domain.models import Decision, ErrorCode, SuperegoError, ToolAction, ToolRequest
+from ..domain.models import (
+    Decision,
+    ErrorCode,
+    SecurityRule,
+    SuperegoError,
+    ToolAction,
+    ToolRequest,
+)
 from ..domain.security_policy import SecurityPolicyEngine
 from ..infrastructure.performance import PerformanceMonitor, ResponseCache
-
 
 logger = structlog.get_logger(__name__)
 
@@ -17,13 +22,13 @@ logger = structlog.get_logger(__name__)
 class OptimizedSecurityPolicyEngine(SecurityPolicyEngine):
     """Security policy engine with performance optimizations."""
 
-    def __init__(
+    def __init__(  # type: ignore[no-untyped-def]
         self,
         rules_file,
         ai_service_manager=None,
         prompt_builder=None,
-        response_cache: Optional[ResponseCache] = None,
-        performance_monitor: Optional[PerformanceMonitor] = None,
+        response_cache: ResponseCache | None = None,
+        performance_monitor: PerformanceMonitor | None = None,
         metrics_collector=None,
     ):
         """Initialize with performance enhancements.
@@ -50,7 +55,7 @@ class OptimizedSecurityPolicyEngine(SecurityPolicyEngine):
         start_time = time.perf_counter()
 
         # Generate cache key for the request
-        cache_key = self._generate_cache_key(request)
+        cache_key = self._generate_request_cache_key(request)
 
         # Check cache first
         cached_decision = await self.response_cache.get(cache_key)
@@ -60,7 +65,10 @@ class OptimizedSecurityPolicyEngine(SecurityPolicyEngine):
                 await self.metrics_collector.update_cache_metrics(
                     "decision_cache", hit=True, size=1
                 )
-            return cached_decision
+            # Cache returns Any, but we know it's a Decision
+            from typing import cast
+
+            return cast(Decision, cached_decision)
 
         if self.metrics_collector:
             await self.metrics_collector.update_cache_metrics(
@@ -128,7 +136,7 @@ class OptimizedSecurityPolicyEngine(SecurityPolicyEngine):
             processing_time_ms=int((time.perf_counter() - start_time) * 1000),
         )
 
-    async def _handle_sampling_optimized(
+    async def _handle_sampling_optimized(  # type: ignore[no-untyped-def]
         self, request: ToolRequest, rule, start_time: float
     ) -> Decision:
         """Handle AI sampling with performance optimizations."""
@@ -147,7 +155,7 @@ class OptimizedSecurityPolicyEngine(SecurityPolicyEngine):
             prompt = self.prompt_builder.build_evaluation_prompt(request, rule)
 
             # Generate cache key for AI evaluation
-            ai_cache_key = f"ai_{rule.id}_{self._generate_cache_key(request)}"
+            ai_cache_key = self._generate_cache_key(request, rule)
 
             # Evaluate with AI (uses its own caching)
             ai_decision = await self.ai_service_manager.evaluate_with_ai(
@@ -171,7 +179,7 @@ class OptimizedSecurityPolicyEngine(SecurityPolicyEngine):
                 # Fail open for availability
                 return Decision(
                     action="allow",
-                    reason=f"AI sampling unavailable - failing open",
+                    reason="AI sampling unavailable - failing open",
                     rule_id=rule.id,
                     confidence=0.3,
                     processing_time_ms=int((time.perf_counter() - start_time) * 1000),
@@ -180,14 +188,29 @@ class OptimizedSecurityPolicyEngine(SecurityPolicyEngine):
                 # Fail closed for other errors
                 return Decision(
                     action="deny",
-                    reason=f"AI sampling error - failing closed",
+                    reason="AI sampling error - failing closed",
                     rule_id=rule.id,
                     confidence=0.8,
                     processing_time_ms=int((time.perf_counter() - start_time) * 1000),
                 )
 
-    def _generate_cache_key(self, request: ToolRequest) -> str:
+    def _generate_cache_key(self, request: ToolRequest, rule: SecurityRule) -> str:
         """Generate cache key for a tool request."""
+        # Create a deterministic string representation
+        key_parts = [
+            rule.id,
+            request.tool_name,
+            str(sorted(request.parameters.items())),
+            request.agent_id,
+            request.cwd,
+        ]
+        key_string = "|".join(key_parts)
+
+        # Return first 16 chars of hash for readable keys
+        return hashlib.sha256(key_string.encode()).hexdigest()[:16]
+
+    def _generate_request_cache_key(self, request: ToolRequest) -> str:
+        """Generate cache key for a general tool request."""
         # Create a deterministic string representation
         key_parts = [
             request.tool_name,

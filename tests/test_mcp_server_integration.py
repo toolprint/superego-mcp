@@ -111,7 +111,7 @@ class TestMCPServerIntegration:
         assert result["confidence"] == 1.0
         assert result["rule_id"] == "test-rule-1"
         assert "processing_time_ms" in result
-        assert result.get("error") != True
+        assert not result.get("error")
 
     @pytest.mark.asyncio
     async def test_evaluate_tool_request_allow(self, configured_server):
@@ -134,7 +134,7 @@ class TestMCPServerIntegration:
         assert result["confidence"] == 1.0
         assert result["rule_id"] == "test-rule-2"
         assert "processing_time_ms" in result
-        assert result.get("error") != True
+        assert not result.get("error")
 
     @pytest.mark.asyncio
     async def test_evaluate_tool_request_no_match(self, configured_server):
@@ -183,7 +183,7 @@ class TestMCPServerIntegration:
             assert result["action"] == "deny"
             assert "Internal security evaluation error" in result["reason"]
             assert result["confidence"] == 0.9
-            assert result["error"] == True
+            assert result["error"]
 
     @pytest.mark.asyncio
     async def test_get_current_rules_resource(self, configured_server):
@@ -361,7 +361,7 @@ class TestMCPServerIntegration:
         assert len(health_data["components"]) == 3
 
         # All components should be healthy by default
-        for component, health in health_data["components"].items():
+        for _component, health in health_data["components"].items():
             assert health["status"] == "healthy"
 
 

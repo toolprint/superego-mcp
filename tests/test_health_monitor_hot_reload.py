@@ -1,7 +1,8 @@
 """Tests for enhanced HealthMonitor with configuration reload tracking."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from superego_mcp.infrastructure.error_handler import HealthMonitor
 

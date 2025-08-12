@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from typing import Any
 
 import structlog
 
@@ -19,7 +20,7 @@ def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
     )
 
     # Configure structlog processors
-    processors = [
+    processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.StackInfoRenderer(),
@@ -49,11 +50,11 @@ def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
     )
 
 
-def get_audit_logger() -> structlog.BoundLogger:
+def get_audit_logger() -> Any:
     """Get the audit logger instance"""
     return structlog.get_logger("audit")
 
 
-def get_application_logger(name: str) -> structlog.BoundLogger:
+def get_application_logger(name: str) -> Any:
     """Get an application logger instance"""
     return structlog.get_logger(name)

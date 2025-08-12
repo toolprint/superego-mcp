@@ -1,7 +1,7 @@
 """Tests for AI service integration."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -280,7 +280,7 @@ class TestAIServiceManager:
 
         # First few calls should timeout
         for _ in range(2):
-            with pytest.raises(Exception):
+            with pytest.raises((TimeoutError, Exception)):
                 await manager.evaluate_with_ai("Test prompt")
 
         # Circuit should now be open

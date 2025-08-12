@@ -135,7 +135,7 @@ class BaseAIService(ABC):
                 response_time_ms=response_time_ms,
             )
 
-    async def close(self):
+    async def close(self) -> None:
         """Close HTTP client."""
         await self.client.aclose()
 
@@ -184,14 +184,14 @@ class ClaudeService(BaseAIService):
                 ErrorCode.AI_SERVICE_UNAVAILABLE,
                 f"Claude API error: {e.response.status_code}",
                 "AI service temporarily unavailable",
-            )
+            ) from e
         except Exception as e:
             self.logger.error("Claude service error", error=str(e))
             raise SuperegoError(
                 ErrorCode.AI_SERVICE_UNAVAILABLE,
                 f"Claude service error: {str(e)}",
                 "AI service temporarily unavailable",
-            )
+            ) from e
 
 
 class OpenAIService(BaseAIService):
@@ -244,20 +244,20 @@ class OpenAIService(BaseAIService):
                 ErrorCode.AI_SERVICE_UNAVAILABLE,
                 f"OpenAI API error: {e.response.status_code}",
                 "AI service temporarily unavailable",
-            )
+            ) from e
         except Exception as e:
             self.logger.error("OpenAI service error", error=str(e))
             raise SuperegoError(
                 ErrorCode.AI_SERVICE_UNAVAILABLE,
                 f"OpenAI service error: {str(e)}",
                 "AI service temporarily unavailable",
-            )
+            ) from e
 
 
 class AIServiceManager:
     """Manages AI service instances with caching and fallback."""
 
-    def __init__(self, config: SamplingConfig, circuit_breaker=None):
+    def __init__(self, config: SamplingConfig, circuit_breaker: Any = None) -> None:
         self.config = config
         self.circuit_breaker = circuit_breaker
         self.logger = structlog.get_logger(__name__)
@@ -273,7 +273,7 @@ class AIServiceManager:
         # Semaphore for concurrent request limiting
         self._semaphore = asyncio.Semaphore(config.max_concurrent_requests)
 
-    def _init_services(self):
+    def _init_services(self) -> None:
         """Initialize AI service instances."""
         # Claude service
         claude_key = os.getenv("ANTHROPIC_API_KEY")
@@ -351,7 +351,9 @@ class AIServiceManager:
     ) -> AIDecision:
         """Evaluate with specific provider, using circuit breaker if available."""
         if self.circuit_breaker:
-            return await self.circuit_breaker.call(service.evaluate, prompt)
+            result = await self.circuit_breaker.call(service.evaluate, prompt)
+            # Circuit breaker returns Any, but we know it should be AIDecision
+            return result  # type: ignore[no-any-return]
         else:
             return await service.evaluate(prompt)
 
@@ -367,7 +369,7 @@ class AIServiceManager:
                     del self._cache[cache_key]
         return None
 
-    async def _set_cached(self, cache_key: str, decision: AIDecision):
+    async def _set_cached(self, cache_key: str, decision: AIDecision) -> None:
         """Cache a decision."""
         async with self._cache_lock:
             self._cache[cache_key] = (decision, time.time())
@@ -381,7 +383,7 @@ class AIServiceManager:
                 for key in sorted_keys[:100]:
                     del self._cache[key]
 
-    async def close(self):
+    async def close(self) -> None:
         """Close all service connections."""
         for service in self._services.values():
             await service.close()

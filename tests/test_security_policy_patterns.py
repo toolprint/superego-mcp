@@ -1,13 +1,15 @@
 """Integration tests for SecurityPolicyEngine with advanced pattern matching."""
 
-import pytest
 import tempfile
-import yaml
+from datetime import UTC
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+import yaml
+
+from superego_mcp.domain.models import SuperegoError, ToolRequest
 from superego_mcp.domain.security_policy import SecurityPolicyEngine
-from superego_mcp.domain.models import ToolRequest, ToolAction
 
 
 class TestSecurityPolicyPatterns:
@@ -314,8 +316,7 @@ class TestSecurityPolicyPatterns:
 
     async def test_time_based_conditions(self):
         """Test time-based condition matching."""
-        from datetime import datetime, timezone
-        from unittest.mock import patch
+        from datetime import datetime
 
         # Mock AI service for sampling
         mock_ai_manager = MagicMock()
@@ -338,7 +339,7 @@ class TestSecurityPolicyPatterns:
         self.engine.prompt_builder = mock_prompt_builder
 
         # Mock time within business hours (10:30 UTC)
-        mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
         with patch("superego_mcp.domain.pattern_engine.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
@@ -356,7 +357,7 @@ class TestSecurityPolicyPatterns:
             assert decision.rule_id == "business_hours"
 
             # Mock time outside business hours (20:30 UTC)
-            mock_now = datetime(2024, 1, 15, 20, 30, 0, tzinfo=timezone.utc)
+            mock_now = datetime(2024, 1, 15, 20, 30, 0, tzinfo=UTC)
             mock_datetime.now.return_value = mock_now
 
             decision = await self.engine.evaluate(request)
@@ -421,7 +422,7 @@ class TestSecurityPolicyPatterns:
             yaml.dump(invalid_rules, f)
 
         # Should raise error on loading
-        with pytest.raises(Exception):
+        with pytest.raises((ValueError, yaml.YAMLError, SuperegoError)):
             SecurityPolicyEngine(invalid_rules_file)
 
     async def test_rule_priority_ordering(self):

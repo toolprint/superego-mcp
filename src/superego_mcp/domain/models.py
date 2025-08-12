@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -94,7 +94,13 @@ class ToolRequest(BaseModel):
     @classmethod
     def sanitize_parameters(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Prevent parameter injection attacks"""
-        return cls._deep_sanitize(v)
+        result = cls._deep_sanitize(v)
+        # Ensure we return a dict as expected
+        if isinstance(result, dict):
+            return result
+        else:
+            # Fallback to original if sanitization returned unexpected type
+            return v
 
     @classmethod
     def _deep_sanitize(cls, obj: Any) -> Any:
@@ -116,10 +122,12 @@ class ToolRequest(BaseModel):
             return [cls._deep_sanitize(item) for item in obj]
         elif isinstance(obj, str):
             # Remove null bytes, control characters, and normalize
-            sanitized = obj.replace("\x00", "").replace("\r\n", "\n")
+            sanitized_str = obj.replace("\x00", "").replace("\r\n", "\n")
             # Remove other control characters except newlines and tabs
-            sanitized = "".join(c for c in sanitized if c.isprintable() or c in "\n\t")
-            return sanitized
+            sanitized_str = "".join(
+                c for c in sanitized_str if c.isprintable() or c in "\n\t"
+            )
+            return sanitized_str
         else:
             return obj
 

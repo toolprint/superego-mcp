@@ -4,8 +4,9 @@ import asyncio
 import sys
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import httpx
 import structlog
@@ -41,7 +42,7 @@ class ResponseCache:
         self.cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self._lock = asyncio.Lock()
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache.
 
         Args:
@@ -64,7 +65,7 @@ class ResponseCache:
             entry.hit_count += 1
             return entry.value
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache.
 
         Args:
@@ -88,7 +89,7 @@ class ResponseCache:
         async with self._lock:
             self.cache.clear()
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -142,7 +143,7 @@ class ConnectionPool:
                 limits=self.limits, timeout=httpx.Timeout(30.0), http2=False
             )
 
-    async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
+    async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """Make HTTP request using connection pool.
 
         Args:
@@ -159,7 +160,7 @@ class ConnectionPool:
         """Close connection pool."""
         await self.client.aclose()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get connection pool statistics.
 
         Returns:
@@ -175,7 +176,7 @@ class ConnectionPool:
 class ObjectPool:
     """Generic object pool for reducing allocations."""
 
-    def __init__(self, factory: callable, max_size: int = 100):
+    def __init__(self, factory: Callable[[], Any], max_size: int = 100):
         """Initialize object pool.
 
         Args:
@@ -184,7 +185,7 @@ class ObjectPool:
         """
         self.factory = factory
         self.max_size = max_size
-        self.pool: List[Any] = []
+        self.pool: list[Any] = []
         self._lock = asyncio.Lock()
         self.created_count = 0
         self.reused_count = 0
@@ -216,7 +217,7 @@ class ObjectPool:
                     obj.reset()
                 self.pool.append(obj)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get pool statistics.
 
         Returns:
@@ -243,9 +244,9 @@ class RequestBatcher:
         """
         self.batch_size = batch_size
         self.batch_timeout = batch_timeout
-        self.pending: List[Tuple[Any, asyncio.Future]] = []
+        self.pending: list[tuple[Any, asyncio.Future]] = []
         self._lock = asyncio.Lock()
-        self._batch_task: Optional[asyncio.Task] = None
+        self._batch_task: asyncio.Task | None = None
 
     async def add_request(self, request: Any) -> Any:
         """Add request to batch.
@@ -256,7 +257,7 @@ class RequestBatcher:
         Returns:
             Request result
         """
-        future = asyncio.Future()
+        future: asyncio.Future[Any] = asyncio.Future()
 
         async with self._lock:
             self.pending.append((request, future))
@@ -283,11 +284,11 @@ class RequestBatcher:
         results = await self._execute_batch([req for req, _ in batch])
 
         # Set results
-        for (_, future), result in zip(batch, results):
+        for (_, future), result in zip(batch, results, strict=False):
             if not future.done():
                 future.set_result(result)
 
-    async def _execute_batch(self, requests: List[Any]) -> List[Any]:
+    async def _execute_batch(self, requests: list[Any]) -> list[Any]:
         """Execute batch of requests (override in subclass).
 
         Args:
@@ -307,9 +308,9 @@ class RequestBatcher:
 class PerformanceMonitor:
     """Monitor and track performance metrics."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize performance monitor."""
-        self.timings: Dict[str, List[float]] = {}
+        self.timings: dict[str, list[float]] = {}
         self._lock = asyncio.Lock()
 
     async def record_timing(self, operation: str, duration: float) -> None:
@@ -330,8 +331,8 @@ class PerformanceMonitor:
                 self.timings[operation] = self.timings[operation][-1000:]
 
     def _calculate_percentiles(
-        self, timings: List[float], percentiles: List[int] = [50, 90, 95, 99]
-    ) -> Dict[int, float]:
+        self, timings: list[float], percentiles: list[int] | None = None
+    ) -> dict[int, float]:
         """Calculate percentiles for timing data (lock-free helper).
 
         Args:
@@ -341,8 +342,10 @@ class PerformanceMonitor:
         Returns:
             Percentile values
         """
+        if percentiles is None:
+            percentiles = [50, 90, 95, 99]
         if not timings:
-            return {p: 0.0 for p in percentiles}
+            return dict.fromkeys(percentiles, 0.0)
 
         sorted_timings = sorted(timings)
         result = {}
@@ -355,8 +358,8 @@ class PerformanceMonitor:
         return result
 
     async def get_percentiles(
-        self, operation: str, percentiles: List[int] = [50, 90, 95, 99]
-    ) -> Dict[int, float]:
+        self, operation: str, percentiles: list[int] | None = None
+    ) -> dict[int, float]:
         """Get timing percentiles for operation.
 
         Args:
@@ -366,11 +369,13 @@ class PerformanceMonitor:
         Returns:
             Percentile values
         """
+        if percentiles is None:
+            percentiles = [50, 90, 95, 99]
         async with self._lock:
             timings = self.timings.get(operation, [])
             return self._calculate_percentiles(timings, percentiles)
 
-    async def get_stats(self, operation: Optional[str] = None) -> Dict[str, Any]:
+    async def get_stats(self, operation: str | None = None) -> dict[str, Any]:
         """Get performance statistics.
 
         Args:

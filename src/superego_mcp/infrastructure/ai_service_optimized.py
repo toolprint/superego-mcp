@@ -2,15 +2,14 @@
 
 import asyncio
 import hashlib
-import json
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from pydantic import BaseModel
 
-from ..domain.models import Decision, ErrorCode, SuperegoError, ToolRequest
+from ..domain.models import ErrorCode, SuperegoError, ToolRequest
 from .ai_service import (
     AIDecision,
     AIProvider,
@@ -20,7 +19,6 @@ from .ai_service import (
 )
 from .performance import ConnectionPool, ResponseCache
 from .request_queue import Priority, RequestQueue
-
 
 logger = structlog.get_logger(__name__)
 
@@ -36,7 +34,7 @@ class OptimizedClaudeService(BaseAIService):
         """Initialize with shared connection pool."""
         super().__init__(config, api_key)
         # Replace default client with pooled client
-        self.client = connection_pool
+        self.client: ConnectionPool = connection_pool  # type: ignore[assignment]
 
     async def evaluate(self, prompt: str) -> AIDecision:
         """Evaluate using Claude API with connection pooling."""
@@ -75,9 +73,9 @@ class OptimizedClaudeService(BaseAIService):
                 ErrorCode.AI_SERVICE_UNAVAILABLE,
                 f"Claude service error: {str(e)}",
                 "AI service temporarily unavailable",
-            )
+            ) from e
 
-    async def close(self):
+    async def close(self) -> None:
         """Don't close shared connection pool."""
         pass  # Connection pool managed externally
 
@@ -93,7 +91,7 @@ class OptimizedOpenAIService(BaseAIService):
         """Initialize with shared connection pool."""
         super().__init__(config, api_key)
         # Replace default client with pooled client
-        self.client = connection_pool
+        self.client: ConnectionPool = connection_pool  # type: ignore[assignment]
 
     async def evaluate(self, prompt: str) -> AIDecision:
         """Evaluate using OpenAI API with connection pooling."""
@@ -138,9 +136,9 @@ class OptimizedOpenAIService(BaseAIService):
                 ErrorCode.AI_SERVICE_UNAVAILABLE,
                 f"OpenAI service error: {str(e)}",
                 "AI service temporarily unavailable",
-            )
+            ) from e
 
-    async def close(self):
+    async def close(self) -> None:
         """Don't close shared connection pool."""
         pass  # Connection pool managed externally
 
@@ -157,13 +155,13 @@ class AIEvaluationRequest(BaseModel):
 class OptimizedAIServiceManager(AIServiceManager):
     """AI service manager with performance optimizations."""
 
-    def __init__(
+    def __init__(  # type: ignore[no-untyped-def]
         self,
         config: SamplingConfig,
-        circuit_breaker=None,
-        connection_pool: Optional[ConnectionPool] = None,
-        response_cache: Optional[ResponseCache] = None,
-        request_queue: Optional[RequestQueue] = None,
+        circuit_breaker: Any = None,
+        connection_pool: ConnectionPool | None = None,
+        response_cache: ResponseCache | None = None,
+        request_queue: RequestQueue | None = None,
         metrics_collector=None,
     ):
         """Initialize with performance enhancements.
@@ -200,7 +198,7 @@ class OptimizedAIServiceManager(AIServiceManager):
         # Semaphore for concurrent request limiting
         self._semaphore = asyncio.Semaphore(config.max_concurrent_requests)
 
-    def _init_optimized_services(self):
+    def _init_optimized_services(self) -> None:
         """Initialize optimized AI service instances."""
         # Claude service
         claude_key = os.getenv("ANTHROPIC_API_KEY")
@@ -232,7 +230,10 @@ class OptimizedAIServiceManager(AIServiceManager):
                 await self.metrics_collector.update_cache_metrics(
                     "ai_response", hit=True, size=1
                 )
-            return cached
+            # Cache returns Any, but we know it's an AIDecision
+            from typing import cast
+
+            return cast(AIDecision, cached)
 
         if self.metrics_collector:
             await self.metrics_collector.update_cache_metrics(
@@ -252,12 +253,17 @@ class OptimizedAIServiceManager(AIServiceManager):
             return await self._evaluate_direct(req["prompt"], req["cache_key"])
 
         # Add to queue with normal priority
+        if self.request_queue is None:
+            raise RuntimeError("Request queue not initialized")
         request = {"prompt": prompt, "cache_key": cache_key}
         result = await self.request_queue.enqueue(
             request, priority=Priority.NORMAL, request_id=cache_key
         )
 
-        return result
+        # Queue returns Any, but we know it should be an AIDecision
+        from typing import cast
+
+        return cast(AIDecision, result)
 
     async def _evaluate_direct(self, prompt: str, cache_key: str) -> AIDecision:
         """Direct evaluation with providers."""
@@ -343,7 +349,7 @@ class OptimizedAIServiceManager(AIServiceManager):
         # Use first 8 chars of hash for readable keys
         return f"ai_{hashlib.sha256(prompt.encode()).hexdigest()[:8]}"
 
-    async def close(self):
+    async def close(self) -> None:
         """Close connections and cleanup."""
         # Close services (they won't close shared pool)
         for service in self._services.values():

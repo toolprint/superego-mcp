@@ -37,7 +37,7 @@ class SuperegoMCPServer:
         """
         self.interception_service = interception_service
         self.config = config
-        self.app = FastMCP("superego-mcp")
+        self.app: FastMCP = FastMCP("superego-mcp")
         self._setup_routes()
 
     def _setup_routes(self) -> None:
@@ -120,11 +120,11 @@ class SuperegoMCPServer:
         )
 
         # Start the FastMCP server
-        await self.app.run(
+        await self.app.run(  # type: ignore[func-returns-value]
             host=self.config.host, port=self.config.port, debug=self.config.debug
         )
 
-    def get_app(self):
+    def get_app(self) -> FastMCP:
         """Get the FastMCP application instance.
 
         Returns:

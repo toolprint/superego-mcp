@@ -1,9 +1,9 @@
 """Configuration file watcher for hot-reload functionality."""
 
 import asyncio
-import logging
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 import structlog
 from watchfiles import awatch

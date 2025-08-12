@@ -1,11 +1,10 @@
 """Tests for the advanced pattern matching engine."""
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
-from superego_mcp.domain.pattern_engine import PatternEngine, PatternType
 from superego_mcp.domain.models import ToolRequest
+from superego_mcp.domain.pattern_engine import PatternEngine
 
 
 class TestPatternEngine:
@@ -221,7 +220,7 @@ class TestPatternEngine:
     def test_time_range_matching(self, mock_datetime):
         """Test time-based condition matching."""
         # Mock current time to 10:30 UTC
-        mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
         # Mock the datetime.now method properly
         def mock_now_func(tz=None):
@@ -244,7 +243,7 @@ class TestPatternEngine:
     def test_time_range_crossing_midnight(self, mock_datetime):
         """Test time range that crosses midnight."""
         # Mock current time to 02:00 UTC
-        mock_now = datetime(2024, 1, 15, 2, 0, 0, tzinfo=timezone.utc)
+        mock_now = datetime(2024, 1, 15, 2, 0, 0, tzinfo=UTC)
 
         # Mock the datetime.now method properly
         def mock_now_func(tz=None):
@@ -260,7 +259,7 @@ class TestPatternEngine:
         assert self.pattern_engine._match_time_range(time_config)
 
         # Time outside crossing range
-        mock_now2 = datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+        mock_now2 = datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC)
 
         def mock_now_func2(tz=None):
             return mock_now2
@@ -363,18 +362,22 @@ class TestPatternEnginePerformance:
         self.pattern_engine.match_regex(pattern, "test_string_pattern")
         stats_after = self.pattern_engine.get_cache_stats()
 
-        # Should have one miss (cache miss for compilation)
+        # Should have added one pattern to cache
         assert (
-            stats_after["regex_cache"]["misses"] > stats_before["regex_cache"]["misses"]
+            stats_after["regex_cache"]["currsize"]
+            > stats_before["regex_cache"]["currsize"]
         )
 
-        # Second use should hit cache
+        # Second use should use the same cached pattern
         stats_before = stats_after
         self.pattern_engine.match_regex(pattern, "another_test_pattern")
         stats_after = self.pattern_engine.get_cache_stats()
 
-        # Should have one more hit
-        assert stats_after["regex_cache"]["hits"] > stats_before["regex_cache"]["hits"]
+        # Cache size should remain the same (pattern already cached)
+        assert (
+            stats_after["regex_cache"]["currsize"]
+            == stats_before["regex_cache"]["currsize"]
+        )
 
     def test_jsonpath_compilation_caching(self):
         """Test that JSONPath compilation uses caching effectively."""
@@ -386,21 +389,21 @@ class TestPatternEnginePerformance:
         self.pattern_engine.match_jsonpath(pattern, data)
         stats_after = self.pattern_engine.get_cache_stats()
 
-        # Should have one miss
+        # Should have added one pattern to cache
         assert (
-            stats_after["jsonpath_cache"]["misses"]
-            > stats_before["jsonpath_cache"]["misses"]
+            stats_after["jsonpath_cache"]["currsize"]
+            > stats_before["jsonpath_cache"]["currsize"]
         )
 
-        # Second use should hit cache
+        # Second use should use the same cached pattern
         stats_before = stats_after
         self.pattern_engine.match_jsonpath(pattern, {"test": {"path": "other_value"}})
         stats_after = self.pattern_engine.get_cache_stats()
 
-        # Should have one more hit
+        # Cache size should remain the same (pattern already cached)
         assert (
-            stats_after["jsonpath_cache"]["hits"]
-            > stats_before["jsonpath_cache"]["hits"]
+            stats_after["jsonpath_cache"]["currsize"]
+            == stats_before["jsonpath_cache"]["currsize"]
         )
 
     def test_pattern_matching_performance(self):

@@ -87,7 +87,7 @@ class TestCircuitBreaker:
     ):
         """Test circuit breaker opens after configured failure threshold"""
         # Cause 5 failures to reach threshold
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 
@@ -101,7 +101,7 @@ class TestCircuitBreaker:
     ):
         """Test that open circuit raises CircuitBreakerOpenError"""
         # Open the circuit
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 
@@ -118,7 +118,7 @@ class TestCircuitBreaker:
     ):
         """Test circuit breaker transitions to half-open after recovery timeout"""
         # Open the circuit
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 
@@ -142,7 +142,7 @@ class TestCircuitBreaker:
     ):
         """Test successful call in half-open state resets to closed"""
         # Open the circuit
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 
@@ -164,7 +164,7 @@ class TestCircuitBreaker:
     ):
         """Test failed call in half-open state returns to open"""
         # Open the circuit
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 
@@ -195,7 +195,7 @@ class TestCircuitBreaker:
     ):
         """Test that timeouts contribute to failure count and can open circuit"""
         # Cause 5 timeouts to open circuit
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(CircuitBreakerOpenError, match="AI service timeout"):
                 await circuit_breaker.call(slow_func)
 
@@ -234,7 +234,7 @@ class TestCircuitBreaker:
         caplog.set_level(logging.INFO)
 
         # Open circuit
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 
@@ -289,7 +289,7 @@ class TestCircuitBreaker:
     ):
         """Test mixed success and failure scenarios"""
         # 3 failures (below threshold)
-        for i in range(3):
+        for _i in range(3):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 
@@ -302,7 +302,7 @@ class TestCircuitBreaker:
         assert state["failure_count"] == 0
 
         # Now it should take 5 more failures to open
-        for i in range(5):
+        for _i in range(5):
             with pytest.raises(ValueError):
                 await circuit_breaker.call(failing_func)
 

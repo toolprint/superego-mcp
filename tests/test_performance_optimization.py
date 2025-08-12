@@ -2,10 +2,10 @@
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 import httpx
+import pytest
 
 from superego_mcp.domain.models import ToolRequest
 from superego_mcp.infrastructure.metrics import MetricsCollector
@@ -436,6 +436,7 @@ async def test_performance_targets():
 
     # Create mock rules file
     import tempfile
+
     import yaml
 
     rules = {

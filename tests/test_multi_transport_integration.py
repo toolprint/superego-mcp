@@ -5,30 +5,24 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
-from httpx import AsyncClient
-from websockets import connect as ws_connect
+
+from superego_mcp.domain.security_policy import SecurityPolicyEngine
+from superego_mcp.infrastructure.config import ConfigManager
+from superego_mcp.infrastructure.error_handler import (
+    AuditLogger,
+    ErrorHandler,
+    HealthMonitor,
+)
+from superego_mcp.presentation.transport_server import MultiTransportServer
 
 # Ensure test environment is detected
 os.environ["TESTING"] = "1"
 
 # Add timeout for all async tests to prevent hanging
 pytestmark = pytest.mark.timeout(30)  # 30 second timeout for all tests in this module
-
-from superego_mcp.domain.security_policy import SecurityPolicyEngine
-from superego_mcp.infrastructure.ai_service import AIServiceManager, SamplingConfig
-from superego_mcp.infrastructure.circuit_breaker import CircuitBreaker
-from superego_mcp.infrastructure.config import ConfigManager, ServerConfig
-from superego_mcp.infrastructure.error_handler import (
-    AuditLogger,
-    ErrorHandler,
-    HealthMonitor,
-)
-from superego_mcp.infrastructure.prompt_builder import SecurePromptBuilder
-from superego_mcp.presentation.transport_server import MultiTransportServer
 
 
 @pytest.fixture
@@ -292,7 +286,6 @@ class TestMultiTransportIntegration:
         from superego_mcp.presentation.websocket_transport import (
             WebSocketTransport,
             WSMessage,
-            WSResponse,
         )
 
         ws_transport = WebSocketTransport(
@@ -350,7 +343,7 @@ class TestMultiTransportIntegration:
         server = integrated_server
 
         # Create SSE transport manually for testing
-        from superego_mcp.presentation.sse_transport import SSETransport, SSEEvent
+        from superego_mcp.presentation.sse_transport import SSEEvent, SSETransport
 
         sse_transport = SSETransport(
             mcp=server.mcp,

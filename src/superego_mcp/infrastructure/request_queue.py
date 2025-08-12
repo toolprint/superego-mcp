@@ -2,9 +2,10 @@
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
@@ -18,7 +19,7 @@ class Priority(Enum):
     NORMAL = 2
     LOW = 3
 
-    def __lt__(self, other):
+    def __lt__(self, other: "Priority") -> bool:
         """Enable priority comparison."""
         return self.value < other.value
 
@@ -84,8 +85,8 @@ class RequestQueue:
         self.total_errors = 0
 
         # Queue monitoring
-        self._monitor_task: Optional[asyncio.Task] = None
-        self._processor_tasks: List[asyncio.Task] = []
+        self._monitor_task: asyncio.Task | None = None
+        self._processor_tasks: list[asyncio.Task] = []
         self._running = False
 
     async def start(self, processor: Callable[[Any], Any]) -> None:
@@ -101,7 +102,7 @@ class RequestQueue:
         self.processor = processor
 
         # Start processor workers
-        for i in range(min(self.max_concurrent, 5)):  # Limit initial workers
+        for _i in range(min(self.max_concurrent, 5)):  # Limit initial workers
             task = asyncio.create_task(self._process_requests())
             self._processor_tasks.append(task)
 
@@ -141,7 +142,7 @@ class RequestQueue:
                         asyncio.gather(*all_tasks, return_exceptions=True),
                         timeout=5.0,  # 5 second timeout for graceful shutdown
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning("Some queue tasks did not stop within timeout")
                 except Exception as e:
                     logger.debug("Error stopping queue tasks", error=str(e))
@@ -157,8 +158,8 @@ class RequestQueue:
         self,
         request: Any,
         priority: Priority = Priority.NORMAL,
-        timeout: Optional[float] = None,
-        request_id: Optional[str] = None,
+        timeout: float | None = None,
+        request_id: str | None = None,
     ) -> Any:
         """Add request to queue.
 
@@ -220,7 +221,7 @@ class RequestQueue:
             )
             raise
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.total_timeout += 1
             logger.warning("Request enqueue timeout", request_id=request_id)
             raise
@@ -236,7 +237,7 @@ class RequestQueue:
                 if queued_request.is_expired():
                     self.total_timeout += 1
                     queued_request.future.set_exception(
-                        asyncio.TimeoutError("Request expired in queue")
+                        TimeoutError("Request expired in queue")
                     )
                     continue
 
@@ -265,11 +266,11 @@ class RequestQueue:
 
                         self.total_processed += 1
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         self.total_timeout += 1
                         if not queued_request.future.done():
                             queued_request.future.set_exception(
-                                asyncio.TimeoutError("Request processing timeout")
+                                TimeoutError("Request processing timeout")
                             )
 
                     except Exception as e:
@@ -329,9 +330,7 @@ class RequestQueue:
                 item = self.queue.get_nowait()
                 if item.is_expired():
                     self.total_timeout += 1
-                    item.future.set_exception(
-                        asyncio.TimeoutError("Request expired in queue")
-                    )
+                    item.future.set_exception(TimeoutError("Request expired in queue"))
                     cleaned += 1
                 else:
                     temp_items.append(item)
@@ -345,7 +344,7 @@ class RequestQueue:
         if cleaned > 0:
             logger.info(f"Cleaned {cleaned} expired requests from queue")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get queue statistics.
 
         Returns:
@@ -367,7 +366,7 @@ class RequestQueue:
             "error_rate": self.total_errors / max(self.total_enqueued, 1),
         }
 
-    async def wait_for_completion(self, timeout: Optional[float] = None) -> bool:
+    async def wait_for_completion(self, timeout: float | None = None) -> bool:
         """Wait for all queued requests to complete.
 
         Args:
@@ -406,8 +405,8 @@ class RequestBatcher:
         self.batch_timeout = batch_timeout
         self.similarity_threshold = similarity_threshold
 
-        self.pending_batches: Dict[str, List[Tuple[Any, asyncio.Future]]] = {}
-        self.batch_timers: Dict[str, asyncio.Task] = {}
+        self.pending_batches: dict[str, list[tuple[Any, asyncio.Future]]] = {}
+        self.batch_timers: dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
 
     async def add_request(self, request: Any, batch_key: str) -> Any:
@@ -420,7 +419,7 @@ class RequestBatcher:
         Returns:
             Request result
         """
-        future = asyncio.Future()
+        future: asyncio.Future[Any] = asyncio.Future()
 
         async with self._lock:
             if batch_key not in self.pending_batches:
@@ -464,7 +463,7 @@ class RequestBatcher:
             results = await self._execute_batch(batch_key, requests)
 
             # Set results
-            for (_, future), result in zip(batch, results):
+            for (_, future), result in zip(batch, results, strict=False):
                 if not future.done():
                     future.set_result(result)
 
@@ -474,7 +473,7 @@ class RequestBatcher:
                 if not future.done():
                     future.set_exception(e)
 
-    async def _execute_batch(self, batch_key: str, requests: List[Any]) -> List[Any]:
+    async def _execute_batch(self, batch_key: str, requests: list[Any]) -> list[Any]:
         """Execute batch of requests (override in subclass).
 
         Args:

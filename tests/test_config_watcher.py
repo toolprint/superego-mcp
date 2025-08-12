@@ -3,12 +3,12 @@
 import asyncio
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
-from superego_mcp.infrastructure.config_watcher import ConfigWatcher
 from superego_mcp.domain.models import ErrorCode, SuperegoError
+from superego_mcp.infrastructure.config_watcher import ConfigWatcher
 
 
 class TestConfigWatcher:

@@ -6,7 +6,6 @@ import signal
 import sys
 from pathlib import Path
 
-from .domain.models import *
 from .domain.security_policy import SecurityPolicyEngine
 from .infrastructure.ai_service import AIServiceManager
 from .infrastructure.circuit_breaker import CircuitBreaker
@@ -16,7 +15,7 @@ from .infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonit
 from .infrastructure.prompt_builder import SecurePromptBuilder
 
 
-def main():
+def main() -> None:
     """Main application bootstrap with hot-reload support"""
     # Setup logging
     logging.basicConfig(level=logging.INFO)
@@ -32,7 +31,7 @@ def main():
         sys.exit(1)
 
 
-async def async_main():
+async def async_main() -> None:
     """Async main function with lifecycle management"""
     # Load configuration
     config_manager = ConfigManager()
@@ -107,7 +106,7 @@ async def async_main():
     # Setup graceful shutdown
     shutdown_event = asyncio.Event()
 
-    def signal_handler():
+    def signal_handler() -> None:
         print("\nShutdown signal received...")
         shutdown_event.set()
 
@@ -169,7 +168,7 @@ async def async_main():
         print("Server shutdown complete")
 
 
-def run_server_with_stdio():
+def run_server_with_stdio() -> None:
     """Run the MCP server with STDIO transport"""
     from .presentation import mcp_server
 
@@ -177,7 +176,7 @@ def run_server_with_stdio():
     mcp_server.run_stdio_server()
 
 
-def cli_main():
+def cli_main() -> None:
     """CLI entry point for the server."""
     main()
 

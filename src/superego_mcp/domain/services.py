@@ -98,6 +98,10 @@ class RuleEngine:
         }
 
         action = action_mapping.get(rule.action, "deny")
+        # action_mapping only contains 'allow' and 'deny', so this is safe
+        from typing import Literal, cast
+
+        action = cast(Literal["allow", "deny"], action)
         reason = rule.reason or f"Action {rule.action.value} applied by rule {rule.id}"
 
         return Decision(
@@ -113,9 +117,11 @@ class InterceptionService:
     """High-level service for tool request interception and security evaluation."""
 
     def __init__(self, security_policy_engine: SecurityPolicyEngine):
-        self.security_policy_engine = security_policy_engine
+        self.security_policy_engine: SecurityPolicyEngine | None = (
+            security_policy_engine
+        )
         # Keep backward compatibility with RuleEngine
-        self.rule_engine = None
+        self.rule_engine: RuleEngine | None = None
 
     @classmethod
     def from_rules_file(cls, rules_file: Path) -> "InterceptionService":

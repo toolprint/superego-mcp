@@ -28,7 +28,7 @@ class CircuitBreaker:
         self.state: Literal["closed", "open", "half_open"] = "closed"
         self.logger = logging.getLogger(__name__)
 
-    async def call(self, func: Callable, *args, **kwargs) -> Any:
+    async def call(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Execute function with circuit breaker protection"""
         if self.state == "open":
             if self._should_attempt_reset():
@@ -50,7 +50,7 @@ class CircuitBreaker:
                 f"AI service call timed out after {self.timeout_seconds}s"
             )
             self._on_failure()
-            raise CircuitBreakerOpenError("AI service timeout")
+            raise CircuitBreakerOpenError("AI service timeout") from None
 
         except Exception as e:
             self.logger.error(f"AI service call failed: {e}")

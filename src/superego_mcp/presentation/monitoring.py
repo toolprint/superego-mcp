@@ -4,11 +4,11 @@ import asyncio
 import json
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 from aiohttp import web
-from aiohttp_sse import sse_response
+from aiohttp_sse import EventSourceResponse, sse_response
 
 from ..infrastructure.metrics import MetricsCollector
 from ..infrastructure.performance import PerformanceMonitor
@@ -40,7 +40,7 @@ class MonitoringDashboard:
         self.port = port
         self.app = web.Application()
         self._setup_routes()
-        self.runner: Optional[web.AppRunner] = None
+        self.runner: web.AppRunner | None = None
 
     def _setup_routes(self) -> None:
         """Set up HTTP routes."""
@@ -199,26 +199,26 @@ class MonitoringDashboard:
 <body>
     <div class="container">
         <h1>Superego MCP Monitoring Dashboard</h1>
-        
+
         <div class="refresh-info">
             Auto-refresh: <span id="refresh-countdown">5</span>s
         </div>
-        
+
         <div class="metrics-grid" id="metrics-grid">
             <!-- Metrics cards will be inserted here -->
         </div>
-        
+
         <div class="chart-container">
             <h2>Request Latency (last 5 minutes)</h2>
             <canvas id="performance-chart"></canvas>
         </div>
-        
+
         <div class="chart-container">
             <h2>System Health</h2>
             <div id="health-status">Loading...</div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Metrics update function
@@ -226,10 +226,10 @@ class MonitoringDashboard:
             try {
                 const response = await fetch('/api/metrics/summary');
                 const data = await response.json();
-                
+
                 const metricsGrid = document.getElementById('metrics-grid');
                 metricsGrid.innerHTML = '';
-                
+
                 // Add metric cards
                 const metrics = [
                     { label: 'Uptime', value: formatUptime(data.uptime_seconds) },
@@ -239,7 +239,7 @@ class MonitoringDashboard:
                     { label: 'Queue Size', value: data.queue_size || '0' },
                     { label: 'Memory Usage', value: formatBytes(data.memory_usage) }
                 ];
-                
+
                 metrics.forEach(metric => {
                     const card = document.createElement('div');
                     card.className = 'metric-card';
@@ -249,21 +249,21 @@ class MonitoringDashboard:
                     `;
                     metricsGrid.appendChild(card);
                 });
-                
+
             } catch (error) {
                 console.error('Failed to update metrics:', error);
             }
         }
-        
+
         // Health status update
         async function updateHealth() {
             try {
                 const response = await fetch('/health');
                 const data = await response.json();
-                
+
                 const healthDiv = document.getElementById('health-status');
                 const statusClass = `status-${data.status}`;
-                
+
                 healthDiv.innerHTML = `
                     <p><span class="status-indicator ${statusClass}"></span>
                     Overall Status: <strong>${data.status}</strong></p>
@@ -278,7 +278,7 @@ class MonitoringDashboard:
                 console.error('Failed to update health:', error);
             }
         }
-        
+
         // Performance chart
         let performanceChart;
         function initPerformanceChart() {
@@ -319,21 +319,21 @@ class MonitoringDashboard:
                 }
             });
         }
-        
+
         // Update performance chart
         async function updatePerformanceChart() {
             try {
                 const response = await fetch('/api/performance');
                 const data = await response.json();
-                
+
                 if (data.request_latency) {
                     const timestamp = new Date().toLocaleTimeString();
-                    
+
                     performanceChart.data.labels.push(timestamp);
                     performanceChart.data.datasets[0].data.push(data.request_latency.p50 * 1000);
                     performanceChart.data.datasets[1].data.push(data.request_latency.p95 * 1000);
                     performanceChart.data.datasets[2].data.push(data.request_latency.p99 * 1000);
-                    
+
                     // Keep only last 30 data points
                     if (performanceChart.data.labels.length > 30) {
                         performanceChart.data.labels.shift();
@@ -341,37 +341,37 @@ class MonitoringDashboard:
                             dataset.data.shift();
                         });
                     }
-                    
+
                     performanceChart.update();
                 }
             } catch (error) {
                 console.error('Failed to update performance chart:', error);
             }
         }
-        
+
         // Utility functions
         function formatUptime(seconds) {
             const days = Math.floor(seconds / 86400);
             const hours = Math.floor((seconds % 86400) / 3600);
             const minutes = Math.floor((seconds % 3600) / 60);
-            
+
             if (days > 0) return `${days}d ${hours}h`;
             if (hours > 0) return `${hours}h ${minutes}m`;
             return `${minutes}m`;
         }
-        
+
         function formatPercent(value) {
             if (value === undefined || value === null) return '0%';
             return `${(value * 100).toFixed(1)}%`;
         }
-        
+
         function formatBytes(bytes) {
             if (!bytes) return '0 B';
             const units = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(1024));
             return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
         }
-        
+
         // Auto-refresh countdown
         let refreshCountdown = 5;
         setInterval(() => {
@@ -384,7 +384,7 @@ class MonitoringDashboard:
             }
             document.getElementById('refresh-countdown').textContent = refreshCountdown;
         }, 1000);
-        
+
         // Initialize
         initPerformanceChart();
         updateMetrics();
@@ -446,7 +446,7 @@ class MonitoringDashboard:
             logger.error("Failed to get performance data", error=str(e))
             return web.json_response({"error": str(e)}, status=500)
 
-    async def handle_metrics_stream(self, request: web.Request) -> web.Response:
+    async def handle_metrics_stream(self, request: web.Request) -> EventSourceResponse:
         """Handle /api/metrics/stream endpoint (SSE).
 
         Args:
@@ -476,7 +476,7 @@ class MonitoringDashboard:
 class AlertManager:
     """Manage alerts based on metric thresholds."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alert manager."""
         self.alert_rules = {
             "high_latency": {
@@ -504,10 +504,10 @@ class AlertManager:
                 "severity": "warning",
             },
         }
-        self.active_alerts: Dict[str, Dict[str, Any]] = {}
-        self.alert_history: List[Dict[str, Any]] = []
+        self.active_alerts: dict[str, dict[str, Any]] = {}
+        self.alert_history: list[dict[str, Any]] = []
 
-    async def check_alerts(self, metrics: Dict[str, float]) -> List[Dict[str, Any]]:
+    async def check_alerts(self, metrics: dict[str, float]) -> list[dict[str, Any]]:
         """Check metrics against alert rules.
 
         Args:
@@ -520,7 +520,7 @@ class AlertManager:
         current_time = time.time()
 
         for alert_name, rule in self.alert_rules.items():
-            metric_value = metrics.get(rule["metric"], 0)
+            metric_value = metrics.get(rule["metric"], 0)  # type: ignore[call-overload]
 
             if metric_value > rule["threshold"]:
                 if alert_name not in self.active_alerts:
@@ -561,7 +561,7 @@ class AlertManager:
 
         return triggered_alerts
 
-    def get_active_alerts(self) -> List[Dict[str, Any]]:
+    def get_active_alerts(self) -> list[dict[str, Any]]:
         """Get currently active alerts.
 
         Returns:
@@ -579,7 +579,7 @@ class AlertManager:
             for name, alert in self.active_alerts.items()
         ]
 
-    def get_alert_history(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_alert_history(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get alert history.
 
         Args:

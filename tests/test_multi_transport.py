@@ -3,19 +3,10 @@
 import asyncio
 import json
 import os
-from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
-
-# Ensure test environment is detected
-os.environ["TESTING"] = "1"
-
-# Add timeout for all async tests to prevent hanging
-pytestmark = pytest.mark.timeout(15)  # 15 second timeout for all tests in this module
 
 from superego_mcp.domain.models import Decision, ToolRequest
 from superego_mcp.domain.security_policy import SecurityPolicyEngine
@@ -29,6 +20,12 @@ from superego_mcp.presentation.http_transport import HTTPTransport
 from superego_mcp.presentation.sse_transport import SSETransport
 from superego_mcp.presentation.transport_server import MultiTransportServer
 from superego_mcp.presentation.websocket_transport import WebSocketTransport
+
+# Ensure test environment is detected
+os.environ["TESTING"] = "1"
+
+# Add timeout for all async tests to prevent hanging
+pytestmark = pytest.mark.timeout(15)  # 15 second timeout for all tests in this module
 
 
 @pytest.fixture
@@ -156,7 +153,7 @@ class TestMultiTransportServer:
         security_policy.evaluate = mock_evaluate
         audit_logger.log_decision = AsyncMock()
 
-        server = MultiTransportServer(
+        MultiTransportServer(
             security_policy=security_policy,
             audit_logger=audit_logger,
             error_handler=error_handler,
@@ -526,7 +523,7 @@ class TestIntegration:
         security_policy.evaluate = mock_evaluate
         audit_logger.log_decision = AsyncMock()
 
-        server = MultiTransportServer(
+        MultiTransportServer(
             security_policy=security_policy,
             audit_logger=audit_logger,
             error_handler=error_handler,
@@ -597,7 +594,7 @@ class TestIntegration:
         error_handler.handle_error.return_value = fallback_decision
         audit_logger.log_decision = AsyncMock()
 
-        server = MultiTransportServer(
+        MultiTransportServer(
             security_policy=security_policy,
             audit_logger=audit_logger,
             error_handler=error_handler,
@@ -619,7 +616,7 @@ class TestIntegration:
         # the error handler would catch it and return a fallback decision
         try:
             await security_policy.evaluate(tool_request)
-            assert False, "Expected an exception to be raised"
+            raise AssertionError("Expected an exception to be raised")
         except Exception as e:
             # This is expected - simulate what the MCP tool would do
             result = error_handler.handle_error(e, tool_request)

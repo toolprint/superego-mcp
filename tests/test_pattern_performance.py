@@ -1,15 +1,16 @@
 """Performance tests for advanced pattern matching functionality."""
 
-import pytest
-import time
+import re
 import tempfile
-import yaml
+import time
 from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
-from superego_mcp.domain.security_policy import SecurityPolicyEngine
-from superego_mcp.domain.pattern_engine import PatternEngine
+import yaml
+
 from superego_mcp.domain.models import ToolRequest
+from superego_mcp.domain.pattern_engine import PatternEngine
+from superego_mcp.domain.security_policy import SecurityPolicyEngine
 
 
 class TestPatternPerformance:
@@ -89,7 +90,7 @@ class TestPatternPerformance:
                 for test_string in test_strings:
                     try:
                         self.pattern_engine.match_regex(pattern, test_string)
-                    except:
+                    except (ValueError, re.error):
                         pass  # Ignore invalid patterns from modification
 
         uncached_time = time.perf_counter() - start_time
@@ -170,8 +171,8 @@ class TestPatternPerformance:
 
         print(f"JSONPath with caching: {cached_time:.3f}s")
         print(
-            f"Cache stats: {cache_stats_before['jsonpath_cache']['hits']} hits, "
-            f"{cache_stats_before['jsonpath_cache']['misses']} misses"
+            f"Cache stats: {cache_stats_before['jsonpath_cache']['currsize']} patterns cached, "
+            f"max size: {cache_stats_before['jsonpath_cache']['maxsize']}"
         )
 
         operations_per_second = (1000 * len(patterns) * len(test_data)) / cached_time
@@ -415,16 +416,16 @@ class TestSecurityPolicyPerformance:
         # Check cache statistics
         cache_stats = self.engine.pattern_engine.get_cache_stats()
         print(
-            f"Regex cache: {cache_stats['regex_cache']['hits']} hits, "
-            f"{cache_stats['regex_cache']['misses']} misses"
+            f"Regex cache: {cache_stats['regex_cache']['currsize']} patterns cached, "
+            f"max size: {cache_stats['regex_cache']['maxsize']}"
         )
         print(
-            f"JSONPath cache: {cache_stats['jsonpath_cache']['hits']} hits, "
-            f"{cache_stats['jsonpath_cache']['misses']} misses"
+            f"JSONPath cache: {cache_stats['jsonpath_cache']['currsize']} patterns cached, "
+            f"max size: {cache_stats['jsonpath_cache']['maxsize']}"
         )
 
-        # Should have significant cache hits
-        assert cache_stats["regex_cache"]["hits"] > 0
+        # Should have cached some patterns
+        assert cache_stats["regex_cache"]["currsize"] > 0
 
     async def test_early_termination_performance(self):
         """Test that rule evaluation terminates early on first match."""
@@ -457,8 +458,9 @@ class TestSecurityPolicyPerformance:
     async def test_memory_usage_stability(self):
         """Test that memory usage remains stable under repeated evaluations."""
         import gc
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
 

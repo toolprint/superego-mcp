@@ -2,7 +2,6 @@
 
 import asyncio
 import hashlib
-import re
 import time
 from pathlib import Path
 from typing import Any
@@ -24,7 +23,7 @@ from .pattern_engine import PatternEngine
 class SecurityPolicyEngine:
     """Rule-based security evaluation with priority matching with hot-reload support"""
 
-    def __init__(
+    def __init__(  # type: ignore[no-untyped-def]
         self,
         rules_file: Path,
         health_monitor=None,
@@ -59,7 +58,7 @@ class SecurityPolicyEngine:
                 ErrorCode.INVALID_CONFIGURATION,
                 f"Failed to parse YAML rules file: {e}",
                 "Security rules configuration is invalid",
-            )
+            ) from e
 
         self.rules = []
         for rule_data in rules_data.get("rules", []):
@@ -75,7 +74,7 @@ class SecurityPolicyEngine:
                     ErrorCode.INVALID_CONFIGURATION,
                     f"Invalid rule configuration: {e}",
                     "One or more security rules are invalid",
-                )
+                ) from e
 
         # Sort by priority (lower number = higher priority)
         self.rules.sort(key=lambda r: r.priority)
@@ -329,7 +328,7 @@ class SecurityPolicyEngine:
                     ErrorCode.INVALID_CONFIGURATION,
                     f"Failed to reload configuration: {e}",
                     "Configuration reload failed, using previous rules",
-                )
+                ) from e
 
     def _generate_cache_key(self, request: ToolRequest, rule: SecurityRule) -> str:
         """Generate cache key for AI decision caching"""

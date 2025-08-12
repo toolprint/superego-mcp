@@ -2,7 +2,8 @@
 
 import asyncio
 import json
-from typing import Any, Dict, Set
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
@@ -12,7 +13,6 @@ from fastmcp import FastMCP
 from pydantic import BaseModel
 from uvicorn import Config, Server
 
-from ..domain.models import Decision, ToolRequest
 from ..domain.security_policy import SecurityPolicyEngine
 from ..infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
 
@@ -31,19 +31,19 @@ class SSEEvent(BaseModel):
 class SSEManager:
     """Manages Server-Sent Event streams."""
 
-    def __init__(self, keepalive_interval: int = 30):
+    def __init__(self, keepalive_interval: int = 30) -> None:
         """Initialize SSE manager.
 
         Args:
             keepalive_interval: Interval in seconds for keepalive messages
         """
         self.keepalive_interval = keepalive_interval
-        self.subscribers: Dict[str, Set[asyncio.Queue]] = {
+        self.subscribers: dict[str, set[asyncio.Queue]] = {
             "config": set(),
             "health": set(),
             "audit": set(),
         }
-        self.keepalive_task = None
+        self.keepalive_task: asyncio.Task[None] | None = None
 
     async def subscribe(self, event_type: str) -> asyncio.Queue:
         """Subscribe to an event type.
@@ -57,7 +57,7 @@ class SSEManager:
         if event_type not in self.subscribers:
             raise ValueError(f"Unknown event type: {event_type}")
 
-        queue = asyncio.Queue()
+        queue: asyncio.Queue[Any] = asyncio.Queue()
         self.subscribers[event_type].add(queue)
 
         logger.info(
@@ -112,7 +112,8 @@ class SSEManager:
 
     async def start_keepalive(self) -> None:
         """Start keepalive task."""
-        self.keepalive_task = asyncio.create_task(self._keepalive_loop())
+        keepalive_task = asyncio.create_task(self._keepalive_loop())
+        self.keepalive_task = keepalive_task
 
     async def stop_keepalive(self) -> None:
         """Stop keepalive task."""
@@ -197,10 +198,10 @@ class SSETransport:
         )
 
         # Server instance
-        self.server = None
+        self.server: Server | None = None
 
         # Background tasks
-        self.monitoring_tasks = []
+        self.monitoring_tasks: list[asyncio.Task[Any]] = []
 
         self._setup_routes()
 
@@ -208,7 +209,7 @@ class SSETransport:
         """Set up SSE routes."""
 
         @self.app.get("/v1/events/config")
-        async def config_events(request: Request):
+        async def config_events(request: Request) -> StreamingResponse:
             """Stream configuration change events.
 
             Returns:
@@ -217,7 +218,7 @@ class SSETransport:
             return await self._create_event_stream("config", request)
 
         @self.app.get("/v1/events/health")
-        async def health_events(request: Request):
+        async def health_events(request: Request) -> StreamingResponse:
             """Stream health status events.
 
             Returns:
@@ -226,7 +227,7 @@ class SSETransport:
             return await self._create_event_stream("health", request)
 
         @self.app.get("/v1/events/audit")
-        async def audit_events(request: Request):
+        async def audit_events(request: Request) -> StreamingResponse:
             """Stream audit entry events.
 
             Returns:
@@ -235,7 +236,7 @@ class SSETransport:
             return await self._create_event_stream("audit", request)
 
         @self.app.get("/v1/events")
-        async def all_events(request: Request):
+        async def all_events(request: Request) -> StreamingResponse:
             """Stream all events (combined).
 
             Returns:
@@ -256,7 +257,7 @@ class SSETransport:
             StreamingResponse with SSE stream
         """
 
-        async def event_generator():
+        async def event_generator() -> AsyncGenerator[str, None]:
             queue = await self.sse_manager.subscribe(event_type)
 
             try:
@@ -272,7 +273,7 @@ class SSETransport:
                         # Format SSE message
                         yield self._format_sse_message(event)
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Send periodic heartbeat
                         heartbeat = SSEEvent(
                             event="heartbeat",
@@ -309,7 +310,7 @@ class SSETransport:
             StreamingResponse with combined SSE stream
         """
 
-        async def event_generator():
+        async def event_generator() -> AsyncGenerator[str, None]:
             # Subscribe to all event types
             queues = {}
             for event_type in self.sse_manager.subscribers:
@@ -529,10 +530,11 @@ class SSETransport:
         )
 
         # Create server
-        self.server = Server(config)
+        server = Server(config)
+        self.server = server
 
         try:
-            await self.server.serve()
+            await server.serve()
         except Exception as e:
             logger.error("SSE transport failed", error=str(e))
             raise
@@ -554,7 +556,7 @@ class SSETransport:
                         asyncio.gather(*self.monitoring_tasks, return_exceptions=True),
                         timeout=3.0,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning("Some monitoring tasks did not stop within timeout")
                 except Exception as e:
                     logger.debug("Error stopping monitoring tasks", error=str(e))
@@ -564,7 +566,7 @@ class SSETransport:
             # Stop keepalive with timeout
             try:
                 await asyncio.wait_for(self.sse_manager.stop_keepalive(), timeout=2.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("SSE keepalive stop timed out")
             except Exception as e:
                 logger.warning("Error stopping SSE keepalive", error=str(e))

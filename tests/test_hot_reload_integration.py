@@ -196,7 +196,7 @@ class TestHotReloadIntegration:
         async def continuous_evaluation():
             """Continuously evaluate requests during reload."""
             results = []
-            for i in range(20):
+            for _i in range(20):
                 try:
                     decision = await security_policy.evaluate(test_request)
                     results.append(decision.action)
@@ -239,8 +239,8 @@ class TestHotReloadIntegration:
     @pytest.mark.integration
     async def test_health_monitoring_during_hot_reload(self, integrated_system):
         """Test health monitoring during hot-reload operations."""
-        security_policy = integrated_system["security_policy"]
-        config_watcher = integrated_system["config_watcher"]
+        integrated_system["security_policy"]
+        integrated_system["config_watcher"]
         health_monitor = integrated_system["health_monitor"]
         rules_file = integrated_system["rules_file"]
 
@@ -398,7 +398,7 @@ class TestHotReloadIntegration:
     async def test_file_deletion_and_recreation(self, integrated_system):
         """Test behavior when config file is deleted and recreated."""
         security_policy = integrated_system["security_policy"]
-        health_monitor = integrated_system["health_monitor"]
+        integrated_system["health_monitor"]
         rules_file = integrated_system["rules_file"]
 
         # Store initial state

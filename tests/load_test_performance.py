@@ -5,7 +5,6 @@ import json
 import random
 import time
 from collections import defaultdict
-from typing import List
 
 import httpx
 import websockets
@@ -68,7 +67,7 @@ class LoadTester:
             response_times = [r for r in self.results["http_response_times"] if r > 0]
             response_times.sort()
 
-            print(f"\n📊 HTTP Load Test Results:")
+            print("\n📊 HTTP Load Test Results:")
             print(f"Total requests: {num_requests}")
             print(f"Successful: {successful}")
             print(f"Errors: {errors}")
@@ -76,7 +75,7 @@ class LoadTester:
             print(f"Throughput: {num_requests / total_time:.2f} req/s")
 
             if response_times:
-                print(f"\nLatency percentiles:")
+                print("\nLatency percentiles:")
                 print(f"P50: {response_times[int(len(response_times) * 0.50)]:.3f}s")
                 print(f"P90: {response_times[int(len(response_times) * 0.90)]:.3f}s")
                 print(f"P95: {response_times[int(len(response_times) * 0.95)]:.3f}s")
@@ -140,7 +139,7 @@ class LoadTester:
         connection_time = time.time() - start_time
         successful_connections = len(connections)
 
-        print(f"\n📊 WebSocket Connection Test Results:")
+        print("\n📊 WebSocket Connection Test Results:")
         print(f"Target connections: {num_connections}")
         print(f"Successful: {successful_connections}")
         print(f"Failed: {num_connections - successful_connections}")
@@ -157,7 +156,7 @@ class LoadTester:
         for ws in connections:
             await ws.close()
 
-    async def _test_websocket_throughput(self, connections: List):
+    async def _test_websocket_throughput(self, connections: list):
         """Test WebSocket message throughput."""
         print(
             f"\n🔄 Testing WebSocket throughput with {len(connections)} connections..."
@@ -177,7 +176,7 @@ class LoadTester:
         total_messages = len(connections) * messages_per_connection
         throughput = total_messages / duration
 
-        print(f"\n📊 WebSocket Throughput Results:")
+        print("\n📊 WebSocket Throughput Results:")
         print(f"Total messages: {total_messages}")
         print(f"Duration: {duration:.2f}s")
         print(f"Throughput: {throughput:.2f} msg/s")
@@ -200,7 +199,7 @@ class LoadTester:
 
             start_time = time.time()
             await ws.send(json.dumps(request))
-            response = await ws.recv()
+            await ws.recv()
             response_time = time.time() - start_time
 
             self.results["websocket_response_times"].append(response_time)
@@ -230,7 +229,7 @@ class LoadTester:
                 response = await client.get(f"{self.metrics_url}/api/metrics/summary")
                 if response.status_code == 200:
                     summary = response.json()
-                    print(f"\n📊 Metrics Summary:")
+                    print("\n📊 Metrics Summary:")
                     print(f"  Uptime: {summary.get('uptime_seconds', 0):.1f}s")
 
             except Exception as e:
@@ -283,7 +282,7 @@ class LoadTester:
         # HTTP stats
         http_times = self.results["http_response_times"]
         if http_times:
-            print(f"\nHTTP Performance:")
+            print("\nHTTP Performance:")
             print(f"  Requests: {len(http_times)}")
             print(f"  Avg latency: {sum(http_times) / len(http_times):.3f}s")
             print(f"  Min latency: {min(http_times):.3f}s")
@@ -292,7 +291,7 @@ class LoadTester:
         # WebSocket stats
         ws_times = self.results["websocket_response_times"]
         if ws_times:
-            print(f"\nWebSocket Performance:")
+            print("\nWebSocket Performance:")
             print(f"  Messages: {len(ws_times)}")
             print(f"  Avg latency: {sum(ws_times) / len(ws_times):.3f}s")
             print(f"  Min latency: {min(ws_times):.3f}s")
@@ -307,10 +306,10 @@ class LoadTester:
             print(f"  HTTP errors: {len(self.results['http_errors'])}")
             print(f"  WebSocket errors: {len(self.results['websocket_errors'])}")
         else:
-            print(f"\n✅ No errors detected!")
+            print("\n✅ No errors detected!")
 
         # Performance targets check
-        print(f"\n🎯 Performance Targets:")
+        print("\n🎯 Performance Targets:")
 
         # Check latency targets
         if http_times:

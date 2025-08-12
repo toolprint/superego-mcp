@@ -1,8 +1,8 @@
 """Unified multi-transport server for Superego MCP Server."""
 
 import asyncio
-import logging
 import os
+import sys
 from typing import Any
 
 import structlog
@@ -46,18 +46,18 @@ class MultiTransportServer:
         self.config = config
 
         # Initialize FastMCP with multi-transport support
-        self.mcp = FastMCP(
+        self.mcp: FastMCP = FastMCP(
             name="Superego MCP Server",
             instructions="Security evaluation and policy enforcement with multi-transport support",
         )
 
         # Transport handlers
-        self.http_transport = None
-        self.websocket_transport = None
-        self.sse_transport = None
+        self.http_transport: HTTPTransport | None = None
+        self.websocket_transport: WebSocketTransport | None = None
+        self.sse_transport: SSETransport | None = None
 
         # Running tasks
-        self.transport_tasks = []
+        self.transport_tasks: list[asyncio.Task[Any]] = []
 
         self._setup_core_tools()
 
@@ -67,7 +67,7 @@ class MultiTransportServer:
             os.environ.get("PYTEST_CURRENT_TEST") is not None
             or os.environ.get("TESTING") == "1"
             or "pytest" in os.environ.get("_", "")
-            or any("pytest" in arg for arg in os.sys.argv if hasattr(os, "sys"))
+            or any("pytest" in arg for arg in sys.argv)
         )
 
     def _setup_core_tools(self) -> None:
@@ -250,6 +250,7 @@ class MultiTransportServer:
                         health_monitor=self.health_monitor,
                         config=transport_config.http.model_dump(),
                     )
+                    assert self.http_transport is not None
                     http_task = asyncio.create_task(self.http_transport.start())
                     self.transport_tasks.append(http_task)
                     logger.info(
@@ -271,6 +272,7 @@ class MultiTransportServer:
                         health_monitor=self.health_monitor,
                         config=transport_config.websocket.model_dump(),
                     )
+                    assert self.websocket_transport is not None
                     ws_task = asyncio.create_task(self.websocket_transport.start())
                     self.transport_tasks.append(ws_task)
                     logger.info(
@@ -289,6 +291,7 @@ class MultiTransportServer:
                         health_monitor=self.health_monitor,
                         config=transport_config.sse.model_dump(),
                     )
+                    assert self.sse_transport is not None
                     sse_task = asyncio.create_task(self.sse_transport.start())
                     self.transport_tasks.append(sse_task)
                     logger.info(
@@ -313,7 +316,7 @@ class MultiTransportServer:
                     await asyncio.wait_for(
                         asyncio.gather(*self.transport_tasks), timeout=timeout
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     if self._is_test_environment():
                         logger.info(
                             "Transport tasks timed out in test environment, continuing..."
@@ -345,7 +348,7 @@ class MultiTransportServer:
                     loop.run_in_executor(None, lambda: self.mcp.run(transport="stdio")),
                     timeout=None,  # STDIO should run indefinitely in production
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("STDIO transport timed out")
                 raise
         except asyncio.CancelledError:
@@ -372,7 +375,7 @@ class MultiTransportServer:
                         asyncio.gather(*self.transport_tasks, return_exceptions=True),
                         timeout=10.0,  # 10 second timeout for graceful shutdown
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         "Some transport tasks did not shut down gracefully within timeout"
                     )
@@ -392,7 +395,7 @@ class MultiTransportServer:
                         asyncio.gather(*shutdown_tasks, return_exceptions=True),
                         timeout=5.0,  # 5 second timeout for transport shutdown
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         "Some transports did not stop gracefully within timeout"
                     )
@@ -411,17 +414,17 @@ class MultiTransportServer:
         """
         return self.mcp
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "MultiTransportServer":
         """Async context manager entry."""
         await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         """Async context manager exit with guaranteed cleanup."""
         await self.stop()
         return False
 
-    def create_test_context(self):
+    def create_test_context(self) -> Any:
         """Create a test-friendly context that doesn't start STDIO transport.
 
         Returns:
@@ -429,10 +432,10 @@ class MultiTransportServer:
         """
 
         class TestContext:
-            def __init__(self, server):
+            def __init__(self, server: "MultiTransportServer") -> None:
                 self.server = server
 
-            async def __aenter__(self):
+            async def __aenter__(self) -> "MultiTransportServer":
                 # Start only non-STDIO transports for testing
                 logger.info("Starting test-friendly multi-transport server")
 
@@ -491,7 +494,7 @@ class MultiTransportServer:
                     await self.server.stop()
                     raise
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
+            async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
                 """Cleanup test context."""
                 await self.server.stop()
                 return False

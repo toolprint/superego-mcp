@@ -1,9 +1,10 @@
 """Infrastructure implementations of domain repositories."""
 
 from pathlib import Path
+from typing import Any
 
 import yaml
-from watchfiles import watch
+from watchfiles import awatch
 
 from superego_mcp.domain.models import SecurityRule
 from superego_mcp.domain.repositories import RuleRepository
@@ -89,18 +90,14 @@ class YamlRuleRepository(RuleRepository):
         with open(self.rules_file_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(rules_data, f, default_flow_style=False, indent=2)
 
-    async def start_file_watcher(self, callback=None):
+    async def start_file_watcher(self, callback: Any = None) -> None:
         """Start watching the rules file for changes.
 
         Args:
             callback: Optional callback to call when file changes
         """
-
-        # This is a simplified version - in production you'd want proper async handling
-        async def watch_files():
-            async for _changes in watch(str(self.rules_file_path)):
-                self.reload_rules()
-                if callback:
-                    await callback()
-
-        return watch_files()
+        # Watch the rules file for changes using async iterator
+        async for _changes in awatch(str(self.rules_file_path)):
+            self.reload_rules()
+            if callback:
+                await callback()
