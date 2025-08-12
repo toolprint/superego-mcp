@@ -87,7 +87,19 @@ class SecurePromptBuilder:
             elif isinstance(value, list):
                 clean_value = str([self._sanitize_text(str(v)) for v in value])[:1000]
             else:
-                clean_value = self._sanitize_text(str(value))
+                # Check if this is a path-like parameter
+                if key.lower() in [
+                    "path",
+                    "file",
+                    "filename",
+                    "filepath",
+                    "directory",
+                    "dir",
+                    "cwd",
+                ]:
+                    clean_value = self._sanitize_path(str(value))
+                else:
+                    clean_value = self._sanitize_text(str(value))
 
             sanitized[clean_key] = clean_value
 

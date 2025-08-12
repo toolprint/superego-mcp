@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 class WSMessage(BaseModel):
     """WebSocket message structure."""
-    
+
     message_id: str
     type: str  # "evaluate", "health", "subscribe", "unsubscribe"
     data: dict[str, Any]
@@ -28,7 +28,7 @@ class WSMessage(BaseModel):
 
 class WSResponse(BaseModel):
     """WebSocket response structure."""
-    
+
     message_id: str
     type: str  # "response", "notification", "error"
     data: dict[str, Any]
@@ -51,19 +51,26 @@ class ConnectionManager:
         """Accept a new WebSocket connection."""
         await websocket.accept()
         self.active_connections.add(websocket)
-        logger.info("WebSocket client connected", total_connections=len(self.active_connections))
+        logger.info(
+            "WebSocket client connected", total_connections=len(self.active_connections)
+        )
 
     def disconnect(self, websocket: WebSocket) -> None:
         """Remove a WebSocket connection."""
         self.active_connections.discard(websocket)
-        
+
         # Remove from all subscriptions
         for subscription_set in self.subscriptions.values():
             subscription_set.discard(websocket)
-            
-        logger.info("WebSocket client disconnected", total_connections=len(self.active_connections))
 
-    async def send_personal_message(self, message: WSResponse, websocket: WebSocket) -> None:
+        logger.info(
+            "WebSocket client disconnected",
+            total_connections=len(self.active_connections),
+        )
+
+    async def send_personal_message(
+        self, message: WSResponse, websocket: WebSocket
+    ) -> None:
         """Send a message to a specific client."""
         try:
             await websocket.send_text(message.model_dump_json())
@@ -71,11 +78,13 @@ class ConnectionManager:
             logger.error("Failed to send WebSocket message", error=str(e))
             self.disconnect(websocket)
 
-    async def broadcast_to_subscribers(self, subscription_type: str, message: WSResponse) -> None:
+    async def broadcast_to_subscribers(
+        self, subscription_type: str, message: WSResponse
+    ) -> None:
         """Broadcast a message to all subscribers of a specific type."""
         if subscription_type not in self.subscriptions:
             return
-            
+
         disconnected = set()
         for websocket in self.subscriptions[subscription_type].copy():
             try:
@@ -83,7 +92,7 @@ class ConnectionManager:
             except Exception as e:
                 logger.error("Failed to broadcast to WebSocket client", error=str(e))
                 disconnected.add(websocket)
-        
+
         # Clean up disconnected clients
         for websocket in disconnected:
             self.disconnect(websocket)
@@ -92,7 +101,7 @@ class ConnectionManager:
         """Subscribe a client to a specific notification type."""
         if subscription_type not in self.subscriptions:
             return False
-        
+
         self.subscriptions[subscription_type].add(websocket)
         return True
 
@@ -100,7 +109,7 @@ class ConnectionManager:
         """Unsubscribe a client from a specific notification type."""
         if subscription_type not in self.subscriptions:
             return False
-        
+
         self.subscriptions[subscription_type].discard(websocket)
         return True
 
@@ -156,7 +165,7 @@ class WebSocketTransport:
 
         # Server instance
         self.server = None
-        
+
         # Background tasks
         self.heartbeat_task = None
 
@@ -169,24 +178,26 @@ class WebSocketTransport:
         async def websocket_endpoint(websocket: WebSocket):
             """Main WebSocket endpoint for MCP communication."""
             await self.connection_manager.connect(websocket)
-            
+
             try:
                 while True:
                     # Receive message from client
                     text_data = await websocket.receive_text()
-                    
+
                     try:
                         # Parse message
                         message_data = json.loads(text_data)
                         message = WSMessage(**message_data)
-                        
+
                         # Handle message
                         response = await self._handle_message(message, websocket)
-                        
+
                         # Send response
                         if response:
-                            await self.connection_manager.send_personal_message(response, websocket)
-                            
+                            await self.connection_manager.send_personal_message(
+                                response, websocket
+                            )
+
                     except ValidationError as e:
                         # Send error response for invalid message format
                         error_response = WSResponse(
@@ -195,8 +206,10 @@ class WebSocketTransport:
                             data={},
                             error=f"Invalid message format: {str(e)}",
                         )
-                        await self.connection_manager.send_personal_message(error_response, websocket)
-                        
+                        await self.connection_manager.send_personal_message(
+                            error_response, websocket
+                        )
+
                     except json.JSONDecodeError:
                         # Send error response for invalid JSON
                         error_response = WSResponse(
@@ -205,7 +218,9 @@ class WebSocketTransport:
                             data={},
                             error="Invalid JSON format",
                         )
-                        await self.connection_manager.send_personal_message(error_response, websocket)
+                        await self.connection_manager.send_personal_message(
+                            error_response, websocket
+                        )
 
             except WebSocketDisconnect:
                 self.connection_manager.disconnect(websocket)
@@ -213,7 +228,9 @@ class WebSocketTransport:
                 logger.error("WebSocket connection error", error=str(e))
                 self.connection_manager.disconnect(websocket)
 
-    async def _handle_message(self, message: WSMessage, websocket: WebSocket) -> WSResponse | None:
+    async def _handle_message(
+        self, message: WSMessage, websocket: WebSocket
+    ) -> WSResponse | None:
         """Handle incoming WebSocket message.
 
         Args:
@@ -241,9 +258,13 @@ class WebSocketTransport:
                     data={},
                     error=f"Unknown message type: {message.type}",
                 )
-                
+
         except Exception as e:
-            logger.error("Error handling WebSocket message", error=str(e), message_type=message.type)
+            logger.error(
+                "Error handling WebSocket message",
+                error=str(e),
+                message_type=message.type,
+            )
             return WSResponse(
                 message_id=message.message_id,
                 type="error",
@@ -251,7 +272,9 @@ class WebSocketTransport:
                 error=str(e),
             )
 
-    async def _handle_evaluate(self, message: WSMessage, websocket: WebSocket) -> WSResponse:
+    async def _handle_evaluate(
+        self, message: WSMessage, websocket: WebSocket
+    ) -> WSResponse:
         """Handle tool evaluation request."""
         try:
             data = message.data
@@ -295,17 +318,19 @@ class WebSocketTransport:
         except Exception as e:
             # Handle errors with centralized error handler
             fallback_decision = self.error_handler.handle_error(e, tool_request)
-            
+
             # Log fallback decision
             await self.audit_logger.log_decision(tool_request, fallback_decision, [])
-            
+
             return WSResponse(
                 message_id=message.message_id,
                 type="response",
                 data=fallback_decision.model_dump(),
             )
 
-    async def _handle_health_check(self, message: WSMessage, websocket: WebSocket) -> WSResponse:
+    async def _handle_health_check(
+        self, message: WSMessage, websocket: WebSocket
+    ) -> WSResponse:
         """Handle health check request."""
         try:
             health_status = await self.health_monitor.check_health()
@@ -322,10 +347,12 @@ class WebSocketTransport:
                 error=str(e),
             )
 
-    async def _handle_subscribe(self, message: WSMessage, websocket: WebSocket) -> WSResponse:
+    async def _handle_subscribe(
+        self, message: WSMessage, websocket: WebSocket
+    ) -> WSResponse:
         """Handle subscription request."""
         subscription_type = message.data.get("subscription_type")
-        
+
         if not subscription_type:
             return WSResponse(
                 message_id=message.message_id,
@@ -335,7 +362,7 @@ class WebSocketTransport:
             )
 
         success = self.connection_manager.subscribe(websocket, subscription_type)
-        
+
         return WSResponse(
             message_id=message.message_id,
             type="response",
@@ -345,10 +372,12 @@ class WebSocketTransport:
             },
         )
 
-    async def _handle_unsubscribe(self, message: WSMessage, websocket: WebSocket) -> WSResponse:
+    async def _handle_unsubscribe(
+        self, message: WSMessage, websocket: WebSocket
+    ) -> WSResponse:
         """Handle unsubscription request."""
         subscription_type = message.data.get("subscription_type")
-        
+
         if not subscription_type:
             return WSResponse(
                 message_id=message.message_id,
@@ -358,7 +387,7 @@ class WebSocketTransport:
             )
 
         success = self.connection_manager.unsubscribe(websocket, subscription_type)
-        
+
         return WSResponse(
             message_id=message.message_id,
             type="response",
@@ -368,7 +397,9 @@ class WebSocketTransport:
             },
         )
 
-    async def _handle_ping(self, message: WSMessage, websocket: WebSocket) -> WSResponse:
+    async def _handle_ping(
+        self, message: WSMessage, websocket: WebSocket
+    ) -> WSResponse:
         """Handle ping request."""
         return WSResponse(
             message_id=message.message_id,
@@ -376,7 +407,9 @@ class WebSocketTransport:
             data={"pong": True, "timestamp": str(asyncio.get_event_loop().time())},
         )
 
-    async def _notify_audit_subscribers(self, tool_request: ToolRequest, decision: Decision) -> None:
+    async def _notify_audit_subscribers(
+        self, tool_request: ToolRequest, decision: Decision
+    ) -> None:
         """Notify audit subscribers of new decision."""
         notification = WSResponse(
             message_id="audit_notification",
@@ -388,7 +421,7 @@ class WebSocketTransport:
                 "timestamp": str(asyncio.get_event_loop().time()),
             },
         )
-        
+
         await self.connection_manager.broadcast_to_subscribers("audit", notification)
 
     async def _start_heartbeat(self) -> None:
@@ -399,17 +432,20 @@ class WebSocketTransport:
                 heartbeat = WSResponse(
                     message_id="heartbeat",
                     type="notification",
-                    data={"heartbeat": True, "timestamp": str(asyncio.get_event_loop().time())},
+                    data={
+                        "heartbeat": True,
+                        "timestamp": str(asyncio.get_event_loop().time()),
+                    },
                 )
-                
+
                 for websocket in self.connection_manager.active_connections.copy():
                     try:
                         await websocket.send_text(heartbeat.model_dump_json())
                     except Exception:
                         self.connection_manager.disconnect(websocket)
-                
+
                 await asyncio.sleep(30)  # 30 second heartbeat
-                
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -443,20 +479,46 @@ class WebSocketTransport:
         except Exception as e:
             logger.error("WebSocket transport failed", error=str(e))
             raise
-        finally:
-            if self.heartbeat_task:
-                self.heartbeat_task.cancel()
 
     async def stop(self) -> None:
-        """Stop the WebSocket server."""
-        if self.heartbeat_task:
-            self.heartbeat_task.cancel()
-            
-        if self.server:
-            logger.info("Stopping WebSocket transport")
-            self.server.should_exit = True
-            # Give it a moment to shut down gracefully
-            await asyncio.sleep(0.1)
+        """Stop the WebSocket server gracefully."""
+        logger.info("Stopping WebSocket transport")
+
+        try:
+            # Cancel and wait for heartbeat task
+            if self.heartbeat_task and not self.heartbeat_task.done():
+                self.heartbeat_task.cancel()
+                try:
+                    await asyncio.wait_for(self.heartbeat_task, timeout=2.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    logger.debug("Heartbeat task cancelled successfully")
+                except Exception as e:
+                    logger.warning("Error stopping heartbeat task", error=str(e))
+
+            # Stop server
+            if self.server:
+                self.server.should_exit = True
+                # Give server more time for graceful shutdown
+                try:
+                    await asyncio.sleep(0.5)
+                except asyncio.CancelledError:
+                    pass
+
+            # Close all active connections
+            for websocket in self.connection_manager.active_connections.copy():
+                try:
+                    await websocket.close()
+                except Exception as e:
+                    logger.debug("Error closing WebSocket connection", error=str(e))
+
+            self.connection_manager.active_connections.clear()
+            for subscription_set in self.connection_manager.subscriptions.values():
+                subscription_set.clear()
+
+        except Exception as e:
+            logger.error("Error during WebSocket transport shutdown", error=str(e))
+        finally:
+            logger.info("WebSocket transport stopped")
 
     def get_app(self) -> FastAPI:
         """Get the FastAPI application instance.

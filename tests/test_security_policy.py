@@ -81,12 +81,22 @@ class TestSecurityPolicyEngine:
         """Test that rules are sorted by priority (lower number = higher priority)."""
         rules_data = {
             "rules": [
-                {"id": "rule_low", "priority": 99, "conditions": {}, "action": "allow"},
-                {"id": "rule_high", "priority": 1, "conditions": {}, "action": "deny"},
+                {
+                    "id": "rule_low",
+                    "priority": 99,
+                    "conditions": {"tool_name": "test"},
+                    "action": "allow",
+                },
+                {
+                    "id": "rule_high",
+                    "priority": 1,
+                    "conditions": {"tool_name": "test"},
+                    "action": "deny",
+                },
                 {
                     "id": "rule_mid",
                     "priority": 10,
-                    "conditions": {},
+                    "conditions": {"tool_name": "test"},
                     "action": "sample",
                 },
             ]
@@ -323,11 +333,11 @@ class TestSecurityPolicyEngine:
 
             decision = await engine.evaluate(request)
 
-            # For Day 1 prototype, sampling should return allow
-            assert decision.action == "allow"
+            # When no AI service is configured, sampling should deny for security
+            assert decision.action == "deny"
             assert decision.rule_id == "sample_rule"
-            assert "sampling" in decision.reason.lower()
-            assert decision.confidence == 0.7
+            assert "AI service not configured" in decision.reason
+            assert decision.confidence == 0.6
         finally:
             rules_file.unlink()
 
@@ -441,12 +451,23 @@ class TestSecurityPolicyEngine:
         finally:
             rules_file.unlink()
 
-    def test_get_rules_count(self):
+    @pytest.mark.asyncio
+    async def test_get_rules_count(self):
         """Test getting the number of loaded rules."""
         rules_data = {
             "rules": [
-                {"id": "rule1", "priority": 1, "conditions": {}, "action": "allow"},
-                {"id": "rule2", "priority": 2, "conditions": {}, "action": "deny"},
+                {
+                    "id": "rule1",
+                    "priority": 1,
+                    "conditions": {"tool_name": "test"},
+                    "action": "allow",
+                },
+                {
+                    "id": "rule2",
+                    "priority": 2,
+                    "conditions": {"tool_name": "test"},
+                    "action": "deny",
+                },
             ]
         }
 
@@ -454,11 +475,12 @@ class TestSecurityPolicyEngine:
 
         try:
             engine = SecurityPolicyEngine(rules_file)
-            assert engine.get_rules_count() == 2
+            assert await engine.get_rules_count() == 2
         finally:
             rules_file.unlink()
 
-    def test_get_rule_by_id(self):
+    @pytest.mark.asyncio
+    async def test_get_rule_by_id(self):
         """Test getting a specific rule by ID."""
         rules_data = {
             "rules": [
@@ -477,23 +499,29 @@ class TestSecurityPolicyEngine:
         try:
             engine = SecurityPolicyEngine(rules_file)
 
-            rule = engine.get_rule_by_id("test_rule")
+            rule = await engine.get_rule_by_id("test_rule")
             assert rule is not None
             assert rule.id == "test_rule"
             assert rule.action == ToolAction.ALLOW
 
             # Test non-existent rule
-            missing_rule = engine.get_rule_by_id("nonexistent")
+            missing_rule = await engine.get_rule_by_id("nonexistent")
             assert missing_rule is None
         finally:
             rules_file.unlink()
 
-    def test_reload_rules(self):
+    @pytest.mark.asyncio
+    async def test_reload_rules(self):
         """Test reloading rules from file."""
         # Initial rules
         initial_rules = {
             "rules": [
-                {"id": "rule1", "priority": 1, "conditions": {}, "action": "allow"}
+                {
+                    "id": "rule1",
+                    "priority": 1,
+                    "conditions": {"tool_name": "test"},
+                    "action": "allow",
+                }
             ]
         }
 
@@ -501,13 +529,23 @@ class TestSecurityPolicyEngine:
 
         try:
             engine = SecurityPolicyEngine(rules_file)
-            assert engine.get_rules_count() == 1
+            assert await engine.get_rules_count() == 1
 
             # Update rules file
             updated_rules = {
                 "rules": [
-                    {"id": "rule1", "priority": 1, "conditions": {}, "action": "allow"},
-                    {"id": "rule2", "priority": 2, "conditions": {}, "action": "deny"},
+                    {
+                        "id": "rule1",
+                        "priority": 1,
+                        "conditions": {"tool_name": "test"},
+                        "action": "allow",
+                    },
+                    {
+                        "id": "rule2",
+                        "priority": 2,
+                        "conditions": {"tool_name": "test"},
+                        "action": "deny",
+                    },
                 ]
             }
 
@@ -515,8 +553,8 @@ class TestSecurityPolicyEngine:
                 yaml.safe_dump(updated_rules, f)
 
             # Reload and verify
-            engine.reload_rules()
-            assert engine.get_rules_count() == 2
+            await engine.reload_rules()
+            assert await engine.get_rules_count() == 2
         finally:
             rules_file.unlink()
 

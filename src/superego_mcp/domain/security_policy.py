@@ -24,7 +24,13 @@ from .pattern_engine import PatternEngine
 class SecurityPolicyEngine:
     """Rule-based security evaluation with priority matching with hot-reload support"""
 
-    def __init__(self, rules_file: Path, health_monitor=None, ai_service_manager=None, prompt_builder=None):
+    def __init__(
+        self,
+        rules_file: Path,
+        health_monitor=None,
+        ai_service_manager=None,
+        prompt_builder=None,
+    ):
         self.rules_file = rules_file
         self.rules: list[SecurityRule] = []
         self._rules_lock = asyncio.Lock()  # Thread-safe access to rules
@@ -59,10 +65,10 @@ class SecurityPolicyEngine:
         for rule_data in rules_data.get("rules", []):
             try:
                 rule = SecurityRule(**rule_data)
-                
+
                 # Validate patterns in rule conditions
                 self._validate_rule_patterns(rule)
-                
+
                 self.rules.append(rule)
             except Exception as e:
                 raise SuperegoError(
@@ -73,11 +79,11 @@ class SecurityPolicyEngine:
 
         # Sort by priority (lower number = higher priority)
         self.rules.sort(key=lambda r: r.priority)
-    
+
     def _validate_rule_patterns(self, rule: SecurityRule) -> None:
         """Validate patterns in rule conditions during loading."""
         conditions = rule.conditions
-        
+
         def validate_pattern_recursive(obj: Any, path: str = "") -> None:
             """Recursively validate patterns in nested structures."""
             if isinstance(obj, dict):
@@ -88,12 +94,16 @@ class SecurityPolicyEngine:
                 else:
                     # Recursively check nested dictionaries
                     for key, value in obj.items():
-                        validate_pattern_recursive(value, f"{path}.{key}" if path else key)
+                        validate_pattern_recursive(
+                            value, f"{path}.{key}" if path else key
+                        )
             elif isinstance(obj, list):
                 # Check patterns in lists
                 for i, item in enumerate(obj):
-                    validate_pattern_recursive(item, f"{path}[{i}]" if path else f"[{i}]")
-        
+                    validate_pattern_recursive(
+                        item, f"{path}[{i}]" if path else f"[{i}]"
+                    )
+
         # Validate all patterns in the rule conditions
         validate_pattern_recursive(conditions, f"rule.{rule.id}.conditions")
 
@@ -121,9 +131,13 @@ class SecurityPolicyEngine:
 
                 if matching_rule.action == ToolAction.SAMPLE:
                     # Delegate to AI sampling engine
-                    return await self._handle_sampling(request, matching_rule, start_time)
+                    return await self._handle_sampling(
+                        request, matching_rule, start_time
+                    )
 
-                processing_time_ms = max(1, int((time.perf_counter() - start_time) * 1000))
+                processing_time_ms = max(
+                    1, int((time.perf_counter() - start_time) * 1000)
+                )
                 return Decision(
                     action=matching_rule.action.value,
                     reason=matching_rule.reason or f"Rule {matching_rule.id} matched",
@@ -141,7 +155,7 @@ class SecurityPolicyEngine:
             # Skip disabled rules
             if not rule.enabled:
                 continue
-                
+
             if self._rule_matches(rule, request):
                 return rule
         return None
@@ -152,16 +166,16 @@ class SecurityPolicyEngine:
             # Handle composite conditions (AND/OR logic)
             if "AND" in rule.conditions or "OR" in rule.conditions:
                 return self.pattern_engine.match_composite(rule.conditions, request)
-            
+
             # Handle individual conditions using pattern engine
             return self.pattern_engine._evaluate_condition(rule.conditions, request)
-            
+
         except Exception as e:
             self.logger.warning(
                 "Rule matching failed, skipping rule",
                 rule_id=rule.id,
                 error=str(e),
-                tool_name=request.tool_name
+                tool_name=request.tool_name,
             )
             return False
 
@@ -171,7 +185,7 @@ class SecurityPolicyEngine:
         """Handle sampling action with AI evaluation"""
         # Check if AI service is available
         if not self.ai_service_manager or not self.prompt_builder:
-            # Fallback to default deny if AI not configured
+            # Fallback to deny if AI not configured (fail closed for security)
             processing_time_ms = max(1, int((time.perf_counter() - start_time) * 1000))
             return Decision(
                 action="deny",
@@ -180,25 +194,22 @@ class SecurityPolicyEngine:
                 confidence=0.6,
                 processing_time_ms=processing_time_ms,
             )
-        
+
         try:
             # Build secure prompt
             prompt = self.prompt_builder.build_evaluation_prompt(request, rule)
-            
+
             # Generate cache key from request
             cache_key = self._generate_cache_key(request, rule)
-            
+
             # Get AI evaluation
             ai_decision = await self.ai_service_manager.evaluate_with_ai(
-                prompt=prompt,
-                cache_key=cache_key
+                prompt=prompt, cache_key=cache_key
             )
-            
+
             # Convert AI decision to domain Decision
-            processing_time_ms = max(
-                1, int((time.perf_counter() - start_time) * 1000)
-            )
-            
+            processing_time_ms = max(1, int((time.perf_counter() - start_time) * 1000))
+
             return Decision(
                 action=ai_decision.decision,
                 reason=ai_decision.reasoning,
@@ -209,7 +220,7 @@ class SecurityPolicyEngine:
                 ai_model=ai_decision.model,
                 risk_factors=ai_decision.risk_factors,
             )
-            
+
         except Exception as e:
             self.logger.error(
                 "AI sampling failed",
@@ -217,7 +228,7 @@ class SecurityPolicyEngine:
                 rule_id=rule.id,
                 tool=request.tool_name,
             )
-            
+
             # Fallback to deny on AI failure (fail closed)
             processing_time_ms = max(1, int((time.perf_counter() - start_time) * 1000))
             return Decision(
@@ -263,32 +274,32 @@ class SecurityPolicyEngine:
             # Create backup of current rules
             self._backup_rules = self.rules.copy()
             original_count = len(self.rules)
-            
+
             self.logger.info(
                 "Starting configuration reload",
                 rules_file=str(self.rules_file),
                 current_rules_count=original_count,
             )
-            
+
             try:
                 # Load new rules
                 self.load_rules()
                 new_count = len(self.rules)
-                
+
                 # Clear backup on successful load
                 self._backup_rules = None
-                
+
                 # Record success in health monitor
                 if self.health_monitor:
                     self.health_monitor.record_config_reload_success()
-                
+
                 self.logger.info(
                     "Configuration reload successful",
                     old_rules_count=original_count,
                     new_rules_count=new_count,
                     rules_file=str(self.rules_file),
                 )
-                
+
             except Exception as e:
                 # Record failure in health monitor
                 if self.health_monitor:
@@ -298,7 +309,7 @@ class SecurityPolicyEngine:
                 if self._backup_rules is not None:
                     self.rules = self._backup_rules
                     self._backup_rules = None
-                    
+
                     self.logger.error(
                         "Configuration reload failed, restored backup",
                         error=str(e),
@@ -313,7 +324,7 @@ class SecurityPolicyEngine:
                         rules_file=str(self.rules_file),
                         exc_info=True,
                     )
-                
+
                 raise SuperegoError(
                     ErrorCode.INVALID_CONFIGURATION,
                     f"Failed to reload configuration: {e}",
@@ -329,15 +340,15 @@ class SecurityPolicyEngine:
             str(sorted(request.parameters.items())),
             request.cwd,
         ]
-        
+
         # Add sampling guidance if present
         if rule.sampling_guidance:
             key_parts.append(rule.sampling_guidance)
-        
+
         # Hash the combined key
         key_str = "|".join(key_parts)
         return hashlib.sha256(key_str.encode()).hexdigest()[:16]
-    
+
     def health_check(self) -> dict[str, Any]:
         """Provide health status for monitoring"""
         # Note: Using synchronous access here for health checks to avoid blocking
@@ -345,12 +356,12 @@ class SecurityPolicyEngine:
         rules_count = len(self.rules)
         enabled_rules_count = sum(1 for rule in self.rules if rule.enabled)
         has_backup = self._backup_rules is not None
-        
+
         health_info = {
             "status": "healthy" if rules_count > 0 else "degraded",
             "message": (
-                f"Loaded {rules_count} security rules ({enabled_rules_count} enabled)" 
-                if rules_count > 0 
+                f"Loaded {rules_count} security rules ({enabled_rules_count} enabled)"
+                if rules_count > 0
                 else "No security rules loaded"
             ),
             "rules_count": rules_count,
@@ -360,9 +371,9 @@ class SecurityPolicyEngine:
             "has_backup": has_backup,
             "pattern_engine": self.pattern_engine.get_cache_stats(),
         }
-        
+
         # Add AI service health if available
         if self.ai_service_manager:
             health_info["ai_service"] = self.ai_service_manager.get_health_status()
-        
+
         return health_info

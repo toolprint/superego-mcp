@@ -157,7 +157,7 @@ class InterceptionService:
         if self.security_policy_engine:
             return {
                 "status": "healthy",
-                "rules_loaded": self.security_policy_engine.get_rules_count(),
+                "rules_loaded": await self.security_policy_engine.get_rules_count(),
                 "service": "InterceptionService",
                 "engine": "SecurityPolicyEngine",
             }

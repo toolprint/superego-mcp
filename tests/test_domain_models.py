@@ -143,14 +143,20 @@ class TestSecurityRule:
         """Test priority validation."""
         # Valid priority
         rule = SecurityRule(
-            id="test-rule", priority=500, conditions={}, action=ToolAction.ALLOW
+            id="test-rule",
+            priority=500,
+            conditions={"tool_name": {"equals": "test"}},
+            action=ToolAction.ALLOW,
         )
         assert rule.priority == 500
 
     def test_immutable_rule(self):
         """Test that rules are immutable."""
         rule = SecurityRule(
-            id="test-rule", priority=10, conditions={}, action=ToolAction.ALLOW
+            id="test-rule",
+            priority=10,
+            conditions={"tool_name": {"equals": "test"}},
+            action=ToolAction.ALLOW,
         )
 
         # Rules should be frozen (immutable)

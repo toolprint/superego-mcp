@@ -37,7 +37,7 @@ async def async_main():
     # Load configuration
     config_manager = ConfigManager()
     config = config_manager.load_config()
-    
+
     # Initialize configuration paths
     config_dir = Path("config")
     rules_file = config_dir / "rules.yaml"
@@ -46,36 +46,37 @@ async def async_main():
     error_handler = ErrorHandler()
     audit_logger = AuditLogger()
     health_monitor = HealthMonitor()
-    
+
     # Create AI components if enabled
     ai_service_manager = None
     prompt_builder = None
-    
+
     if config.ai_sampling.enabled:
         # Create circuit breaker for AI service
         ai_circuit_breaker = CircuitBreaker(
             failure_threshold=5,
             recovery_timeout=30,
-            timeout_seconds=config.ai_sampling.timeout_seconds
+            timeout_seconds=config.ai_sampling.timeout_seconds,
         )
-        
+
         # Create AI service manager
         ai_service_manager = AIServiceManager(
-            config=config.ai_sampling,
-            circuit_breaker=ai_circuit_breaker
+            config=config.ai_sampling, circuit_breaker=ai_circuit_breaker
         )
-        
+
         # Create secure prompt builder
         prompt_builder = SecurePromptBuilder()
-        
-        print(f"AI sampling enabled with primary provider: {config.ai_sampling.primary_provider}")
-    
+
+        print(
+            f"AI sampling enabled with primary provider: {config.ai_sampling.primary_provider}"
+        )
+
     # Create security policy with all dependencies
     security_policy = SecurityPolicyEngine(
         rules_file=rules_file,
         health_monitor=health_monitor,
         ai_service_manager=ai_service_manager,
-        prompt_builder=prompt_builder
+        prompt_builder=prompt_builder,
     )
 
     # Create config watcher with reload callback
@@ -105,7 +106,7 @@ async def async_main():
 
     # Setup graceful shutdown
     shutdown_event = asyncio.Event()
-    
+
     def signal_handler():
         print("\nShutdown signal received...")
         shutdown_event.set()
@@ -117,17 +118,22 @@ async def async_main():
     try:
         # Start config watcher
         await config_watcher.start()
-        
+
         print("Configuration hot-reload enabled")
-        
+
         # Log enabled transports
         enabled_transports = []
-        if getattr(config, 'transport', None):
-            for transport_name, transport_config in config.transport.model_dump().items():
-                if transport_config.get('enabled', False) or transport_name == 'stdio':
+        if getattr(config, "transport", None):
+            for (
+                transport_name,
+                transport_config,
+            ) in config.transport.model_dump().items():
+                if transport_config.get("enabled", False) or transport_name == "stdio":
                     enabled_transports.append(transport_name.upper())
-        
-        print(f"Enabled transports: {', '.join(enabled_transports) if enabled_transports else 'STDIO only'}")
+
+        print(
+            f"Enabled transports: {', '.join(enabled_transports) if enabled_transports else 'STDIO only'}"
+        )
         print("Server ready - press Ctrl+C to stop")
 
         # Run server in a separate task to allow for graceful shutdown
@@ -136,8 +142,7 @@ async def async_main():
 
         # Wait for either server completion or shutdown signal
         done, pending = await asyncio.wait(
-            [server_task, shutdown_task],
-            return_when=asyncio.FIRST_COMPLETED
+            [server_task, shutdown_task], return_when=asyncio.FIRST_COMPLETED
         )
 
         # Cancel pending tasks
@@ -152,22 +157,22 @@ async def async_main():
         # Cleanup resources
         print("Stopping multi-transport server...")
         await multi_transport_server.stop()
-        
+
         print("Stopping configuration watcher...")
         await config_watcher.stop()
-        
+
         # Cleanup AI service if initialized
         if ai_service_manager:
             print("Closing AI service connections...")
             await ai_service_manager.close()
-        
+
         print("Server shutdown complete")
 
 
 def run_server_with_stdio():
     """Run the MCP server with STDIO transport"""
     from .presentation import mcp_server
-    
+
     # This will run synchronously and block
     mcp_server.run_stdio_server()
 

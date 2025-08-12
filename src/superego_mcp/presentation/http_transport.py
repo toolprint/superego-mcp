@@ -21,7 +21,7 @@ logger = structlog.get_logger(__name__)
 
 class EvaluateRequest(BaseModel):
     """Request model for tool evaluation via HTTP."""
-    
+
     tool_name: str
     parameters: dict[str, Any]
     agent_id: str
@@ -31,7 +31,7 @@ class EvaluateRequest(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response model for health check."""
-    
+
     status: str
     timestamp: str
     components: dict[str, Any]
@@ -126,19 +126,23 @@ class HTTPTransport:
 
                 # Log decision to audit trail
                 rule_matches = [decision.rule_id] if decision.rule_id else []
-                await self.audit_logger.log_decision(tool_request, decision, rule_matches)
+                await self.audit_logger.log_decision(
+                    tool_request, decision, rule_matches
+                )
 
                 return decision
 
             except Exception as e:
                 logger.error("HTTP: Tool evaluation failed", error=str(e))
-                
+
                 # Handle errors with centralized error handler
                 fallback_decision = self.error_handler.handle_error(e, tool_request)
-                
+
                 # Log fallback decision
-                await self.audit_logger.log_decision(tool_request, fallback_decision, [])
-                
+                await self.audit_logger.log_decision(
+                    tool_request, fallback_decision, []
+                )
+
                 return fallback_decision
 
         @self.app.get("/v1/health", response_model=HealthResponse)
@@ -174,7 +178,10 @@ class HTTPTransport:
             """
             try:
                 rules_data = {
-                    "rules": [rule.model_dump(mode="json") for rule in self.security_policy.rules],
+                    "rules": [
+                        rule.model_dump(mode="json")
+                        for rule in self.security_policy.rules
+                    ],
                     "total_rules": len(self.security_policy.rules),
                     "last_updated": (
                         self.security_policy.rules_file.stat().st_mtime
@@ -221,8 +228,12 @@ class HTTPTransport:
             try:
                 health_status = await self.health_monitor.check_health()
                 metrics = {
-                    "system_metrics": health_status.components.get("system_metrics", {}),
-                    "security_policy_health": health_status.components.get("security_policy", {}),
+                    "system_metrics": health_status.components.get(
+                        "system_metrics", {}
+                    ),
+                    "security_policy_health": health_status.components.get(
+                        "security_policy", {}
+                    ),
                     "audit_stats": self.audit_logger.get_stats(),
                 }
                 return metrics
@@ -262,7 +273,9 @@ class HTTPTransport:
         @self.app.exception_handler(Exception)
         async def global_exception_handler(request, exc):
             """Global exception handler for unhandled errors."""
-            logger.error("HTTP: Unhandled exception", error=str(exc), path=str(request.url))
+            logger.error(
+                "HTTP: Unhandled exception", error=str(exc), path=str(request.url)
+            )
             return JSONResponse(
                 status_code=500,
                 content={

@@ -232,9 +232,11 @@ class HealthMonitor:
         }
 
         # Add configuration reload metrics
-        metrics.update({
-            "config_reload_metrics": self._config_reload_metrics.copy(),
-        })
+        metrics.update(
+            {
+                "config_reload_metrics": self._config_reload_metrics.copy(),
+            }
+        )
 
         # Determine overall status
         overall_status = self._determine_overall_status(component_health)
@@ -263,7 +265,7 @@ class HealthMonitor:
     def record_config_reload_attempt(self) -> None:
         """Record a configuration reload attempt"""
         import time
-        
+
         self._config_reload_metrics["total_reloads"] += 1
         self._config_reload_metrics["last_reload_time"] = time.time()
 
@@ -282,7 +284,7 @@ class HealthMonitor:
         total = self._config_reload_metrics["total_reloads"]
         if total == 0:
             return 1.0  # No reloads attempted yet, assume healthy
-        
+
         successful = self._config_reload_metrics["successful_reloads"]
         return successful / total
 

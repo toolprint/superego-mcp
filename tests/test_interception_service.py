@@ -64,8 +64,18 @@ class TestInterceptionService:
         """Test health check with SecurityPolicyEngine."""
         rules_data = {
             "rules": [
-                {"id": "rule1", "priority": 1, "conditions": {}, "action": "allow"},
-                {"id": "rule2", "priority": 2, "conditions": {}, "action": "deny"},
+                {
+                    "id": "rule1",
+                    "priority": 1,
+                    "conditions": {"tool_name": {"equals": "safe_tool"}},
+                    "action": "allow",
+                },
+                {
+                    "id": "rule2",
+                    "priority": 2,
+                    "conditions": {"tool_name": {"equals": "dangerous_tool"}},
+                    "action": "deny",
+                },
             ]
         }
 

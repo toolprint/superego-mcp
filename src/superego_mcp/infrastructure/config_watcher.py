@@ -21,7 +21,7 @@ class ConfigWatcher:
         debounce_seconds: float = 1.0,
     ):
         """Initialize the config watcher.
-        
+
         Args:
             watch_path: Path to the configuration file to monitor
             reload_callback: Async callback to execute on file changes
@@ -64,7 +64,7 @@ class ConfigWatcher:
     async def stop(self) -> None:
         """Stop watching and cleanup resources."""
         self.logger.info("Stopping configuration file watcher")
-        
+
         # Signal shutdown
         self._shutdown_event.set()
 
@@ -103,8 +103,7 @@ class ConfigWatcher:
             async for changes in awatch(watch_dir, stop_event=self._shutdown_event):
                 # Filter changes to only our target file
                 relevant_changes = [
-                    change for change in changes 
-                    if Path(change[1]).name == filename
+                    change for change in changes if Path(change[1]).name == filename
                 ]
 
                 if not relevant_changes:
@@ -112,7 +111,9 @@ class ConfigWatcher:
 
                 self.logger.debug(
                     "Configuration file change detected",
-                    changes=[(change[0].name, change[1]) for change in relevant_changes],
+                    changes=[
+                        (change[0].name, change[1]) for change in relevant_changes
+                    ],
                 )
 
                 # Schedule debounced reload
@@ -196,10 +197,14 @@ class ConfigWatcher:
 
         return {
             "status": "healthy" if is_running else "unhealthy",
-            "message": "File watcher active" if is_running else "File watcher not running",
+            "message": "File watcher active"
+            if is_running
+            else "File watcher not running",
             "is_running": is_running,
             "watch_path": str(self.watch_path),
-            "last_reload_time": self._last_reload_time if self._last_reload_time > 0 else None,
+            "last_reload_time": self._last_reload_time
+            if self._last_reload_time > 0
+            else None,
             "last_reload_age_seconds": last_reload_age,
             "debounce_seconds": self.debounce_seconds,
         }

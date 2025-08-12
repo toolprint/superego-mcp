@@ -12,7 +12,7 @@ from ..infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMoni
 # Initialize FastMCP server with sampling support
 mcp = FastMCP(
     name="Superego MCP Server",
-    instructions="Security evaluation and policy enforcement for AI agent tool usage with AI-based sampling support"
+    instructions="Security evaluation and policy enforcement for AI agent tool usage with AI-based sampling support",
 )
 
 # Global components (will be injected)
@@ -133,7 +133,7 @@ async def evaluate_tool_with_human_review(
     ctx: Context,
 ) -> dict:
     """Evaluate tool request with additional human justification for sensitive operations"""
-    
+
     try:
         # Create domain model from request
         request = ToolRequest(
@@ -146,13 +146,13 @@ async def evaluate_tool_with_human_review(
 
         # Apply security policy evaluation
         decision = await security_policy.evaluate(request)
-        
+
         # Log the human justification along with the decision
         audit_entry_data = {
             "human_justification": human_justification,
             "decision": decision.model_dump(),
         }
-        
+
         # Extract rule matches for audit trail
         rule_matches = []
         if decision.rule_id:
@@ -197,9 +197,9 @@ async def get_ai_sampling_config() -> str:
         # Get AI service health from security policy
         health_data = security_policy.health_check()
         ai_config = health_data.get("ai_service", {})
-        
+
         return json.dumps(ai_config, indent=2, default=str)
-        
+
     except Exception as e:
         return f"Error loading AI sampling config: {str(e)}"
 

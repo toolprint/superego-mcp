@@ -291,7 +291,7 @@ class TestSecurePromptBuilder:
         rule_with_none = SecurityRule(
             id="rule-002",
             priority=1,
-            conditions={},
+            conditions={"tool_name": "test_tool"},  # Valid non-empty conditions
             action=ToolAction.SAMPLE,
             sampling_guidance=None,  # None guidance
         )

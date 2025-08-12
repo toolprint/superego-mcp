@@ -11,7 +11,7 @@ from ..infrastructure.ai_service import AIProvider, SamplingConfig
 
 class TransportConfig(BaseModel):
     """Individual transport configuration."""
-    
+
     enabled: bool = Field(default=False, description="Enable this transport")
     host: str = Field(default="0.0.0.0", description="Transport host address")
     port: int = Field(description="Transport port")
@@ -20,69 +20,96 @@ class TransportConfig(BaseModel):
 
 class HTTPTransportConfig(TransportConfig):
     """HTTP transport configuration."""
-    
+
     port: int = Field(default=8000, description="HTTP server port")
 
 
 class WebSocketTransportConfig(TransportConfig):
     """WebSocket transport configuration."""
-    
+
     port: int = Field(default=8001, description="WebSocket server port")
-    ping_interval: int = Field(default=20, description="WebSocket ping interval in seconds")
-    ping_timeout: int = Field(default=30, description="WebSocket ping timeout in seconds")
+    ping_interval: int = Field(
+        default=20, description="WebSocket ping interval in seconds"
+    )
+    ping_timeout: int = Field(
+        default=30, description="WebSocket ping timeout in seconds"
+    )
 
 
 class SSETransportConfig(TransportConfig):
     """Server-Sent Events transport configuration."""
-    
+
     port: int = Field(default=8002, description="SSE server port")
-    keepalive_interval: int = Field(default=30, description="Keepalive interval in seconds")
+    keepalive_interval: int = Field(
+        default=30, description="Keepalive interval in seconds"
+    )
 
 
 class MultiTransportConfig(BaseModel):
     """Multi-transport configuration."""
-    
-    stdio: dict[str, Any] = Field(default_factory=dict, description="STDIO transport config (always enabled)")
-    http: HTTPTransportConfig = Field(default_factory=HTTPTransportConfig, description="HTTP transport config")
-    websocket: WebSocketTransportConfig = Field(default_factory=WebSocketTransportConfig, description="WebSocket transport config")
-    sse: SSETransportConfig = Field(default_factory=SSETransportConfig, description="SSE transport config")
+
+    stdio: dict[str, Any] = Field(
+        default_factory=dict, description="STDIO transport config (always enabled)"
+    )
+    http: HTTPTransportConfig = Field(
+        default_factory=HTTPTransportConfig, description="HTTP transport config"
+    )
+    websocket: WebSocketTransportConfig = Field(
+        default_factory=WebSocketTransportConfig,
+        description="WebSocket transport config",
+    )
+    sse: SSETransportConfig = Field(
+        default_factory=SSETransportConfig, description="SSE transport config"
+    )
 
 
 class RequestQueueConfig(BaseModel):
     """Request queue configuration."""
-    
+
     max_size: int = Field(default=1000, description="Maximum queue size")
     timeout_seconds: int = Field(default=30, description="Request timeout in seconds")
-    ai_sampling_concurrency: int = Field(default=10, description="Concurrent AI sampling requests")
-    enable_backpressure: bool = Field(default=True, description="Enable backpressure handling")
+    ai_sampling_concurrency: int = Field(
+        default=10, description="Concurrent AI sampling requests"
+    )
+    enable_backpressure: bool = Field(
+        default=True, description="Enable backpressure handling"
+    )
 
 
 class ConnectionPoolingConfig(BaseModel):
     """Connection pooling configuration."""
-    
+
     max_connections: int = Field(default=100, description="Maximum total connections")
-    max_keepalive_connections: int = Field(default=20, description="Maximum keepalive connections")
-    keepalive_timeout: int = Field(default=30, description="Keepalive timeout in seconds")
+    max_keepalive_connections: int = Field(
+        default=20, description="Maximum keepalive connections"
+    )
+    keepalive_timeout: int = Field(
+        default=30, description="Keepalive timeout in seconds"
+    )
 
 
 class CachingConfig(BaseModel):
     """Caching configuration."""
-    
-    response_cache_ttl: int = Field(default=300, description="Response cache TTL in seconds")
+
+    response_cache_ttl: int = Field(
+        default=300, description="Response cache TTL in seconds"
+    )
     pattern_cache_size: int = Field(default=1000, description="Pattern cache size")
-    enable_compression: bool = Field(default=True, description="Enable cache compression")
+    enable_compression: bool = Field(
+        default=True, description="Enable cache compression"
+    )
 
 
 class MemoryConfig(BaseModel):
     """Memory optimization configuration."""
-    
+
     object_pool_size: int = Field(default=100, description="Object pool size")
     intern_strings: bool = Field(default=True, description="Enable string interning")
 
 
 class BatchingConfig(BaseModel):
     """Request batching configuration."""
-    
+
     enabled: bool = Field(default=True, description="Enable request batching")
     batch_size: int = Field(default=10, description="Maximum batch size")
     batch_timeout: float = Field(default=0.5, description="Batch timeout in seconds")
@@ -90,14 +117,24 @@ class BatchingConfig(BaseModel):
 
 class PerformanceConfig(BaseModel):
     """Performance optimization configuration."""
-    
+
     metrics_enabled: bool = Field(default=True, description="Enable metrics collection")
     metrics_port: int = Field(default=9090, description="Metrics endpoint port")
-    request_queue: RequestQueueConfig = Field(default_factory=RequestQueueConfig, description="Request queue config")
-    connection_pooling: ConnectionPoolingConfig = Field(default_factory=ConnectionPoolingConfig, description="Connection pooling config")
-    caching: CachingConfig = Field(default_factory=CachingConfig, description="Caching config")
-    memory: MemoryConfig = Field(default_factory=MemoryConfig, description="Memory optimization config")
-    batching: BatchingConfig = Field(default_factory=BatchingConfig, description="Request batching config")
+    request_queue: RequestQueueConfig = Field(
+        default_factory=RequestQueueConfig, description="Request queue config"
+    )
+    connection_pooling: ConnectionPoolingConfig = Field(
+        default_factory=ConnectionPoolingConfig, description="Connection pooling config"
+    )
+    caching: CachingConfig = Field(
+        default_factory=CachingConfig, description="Caching config"
+    )
+    memory: MemoryConfig = Field(
+        default_factory=MemoryConfig, description="Memory optimization config"
+    )
+    batching: BatchingConfig = Field(
+        default_factory=BatchingConfig, description="Request batching config"
+    )
 
 
 class ServerConfig(BaseModel):
@@ -123,23 +160,22 @@ class ServerConfig(BaseModel):
     rate_limit_requests: int = Field(
         default=100, description="Requests per minute limit"
     )
-    
+
     # AI Sampling configuration
     ai_sampling: SamplingConfig = Field(
-        default_factory=SamplingConfig,
-        description="AI sampling configuration"
+        default_factory=SamplingConfig, description="AI sampling configuration"
     )
-    
+
     # Multi-transport configuration
     transport: MultiTransportConfig = Field(
         default_factory=MultiTransportConfig,
-        description="Multi-transport configuration"
+        description="Multi-transport configuration",
     )
-    
+
     # Performance optimization configuration
     performance: PerformanceConfig = Field(
         default_factory=PerformanceConfig,
-        description="Performance optimization configuration"
+        description="Performance optimization configuration",
     )
 
     class Config:

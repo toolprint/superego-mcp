@@ -18,7 +18,7 @@ class ToolAction(str, Enum):
 
 class PatternType(str, Enum):
     """Supported pattern matching types."""
-    
+
     STRING = "string"
     REGEX = "regex"
     GLOB = "glob"
@@ -27,21 +27,29 @@ class PatternType(str, Enum):
 
 class PatternConfig(BaseModel):
     """Configuration for advanced pattern matching."""
-    
+
     type: PatternType
     pattern: str
-    case_sensitive: bool = Field(default=True, description="Case sensitivity for string patterns")
-    
+    case_sensitive: bool = Field(
+        default=True, description="Case sensitivity for string patterns"
+    )
+
     model_config = {"frozen": True}
 
 
 class TimeRangeConfig(BaseModel):
     """Configuration for time-based rule activation."""
-    
-    start: str = Field(pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]$", description="Start time in HH:MM format")
-    end: str = Field(pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]$", description="End time in HH:MM format")
+
+    start: str = Field(
+        pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]$",
+        description="Start time in HH:MM format",
+    )
+    end: str = Field(
+        pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]$",
+        description="End time in HH:MM format",
+    )
     timezone: str = Field(default="UTC", description="Timezone identifier")
-    
+
     model_config = {"frozen": True}
 
 
@@ -126,25 +134,30 @@ class SecurityRule(BaseModel):
     reason: str | None = None
     sampling_guidance: str | None = None
     enabled: bool = Field(default=True, description="Whether the rule is active")
-    
+
     model_config = {"frozen": True}  # Immutable rules
-    
+
     @field_validator("conditions")
     @classmethod
     def validate_conditions(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate rule conditions structure."""
         if not v:
             raise ValueError("Conditions cannot be empty")
-        
+
         # Validate that we have at least one valid condition key
         valid_keys = {
-            "tool_name", "parameters", "cwd", "cwd_pattern", 
-            "time_range", "AND", "OR"
+            "tool_name",
+            "parameters",
+            "cwd",
+            "cwd_pattern",
+            "time_range",
+            "AND",
+            "OR",
         }
-        
+
         if not any(key in valid_keys for key in v.keys()):
             raise ValueError(f"Conditions must contain at least one of: {valid_keys}")
-        
+
         return v
 
 

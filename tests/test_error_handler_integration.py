@@ -319,5 +319,14 @@ class TestHealthMonitoringComponentIntegration:
 
         # Verify the health status model structure
         assert isinstance(health_status.metrics, dict)
-        assert len(health_status.metrics) == 3
-        assert all(isinstance(v, (int, float)) for v in health_status.metrics.values())
+        assert (
+            len(health_status.metrics) == 4
+        )  # cpu, memory, disk, config_reload_metrics
+
+        # Check system metrics are floats
+        assert isinstance(health_status.metrics["cpu_percent"], float)
+        assert isinstance(health_status.metrics["memory_percent"], float)
+        assert isinstance(health_status.metrics["disk_usage_percent"], float)
+
+        # Check config reload metrics is a dict
+        assert isinstance(health_status.metrics["config_reload_metrics"], dict)
