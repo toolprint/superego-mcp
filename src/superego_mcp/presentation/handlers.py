@@ -8,6 +8,7 @@ import structlog
 
 from superego_mcp.domain.models import Decision, ToolRequest
 from superego_mcp.domain.services import InterceptionService
+from superego_mcp.infrastructure.security_formatter import SecurityDecisionFormatter
 
 logger = structlog.get_logger(__name__)
 
@@ -15,13 +16,18 @@ logger = structlog.get_logger(__name__)
 class SecurityEvaluationHandler:
     """Handler for security evaluation requests."""
 
-    def __init__(self, interception_service: InterceptionService):
+    def __init__(
+        self, interception_service: InterceptionService, show_decisions: bool = True
+    ):
         """Initialize the handler.
 
         Args:
             interception_service: Service for handling security evaluations
+            show_decisions: Whether to display security decisions in interactive mode
         """
         self.interception_service = interception_service
+        self.show_decisions = show_decisions
+        self.formatter = SecurityDecisionFormatter() if show_decisions else None
 
     async def handle_evaluate_request(
         self,
@@ -55,6 +61,10 @@ class SecurityEvaluationHandler:
         try:
             decision = await self.interception_service.evaluate_request(request)
 
+            # Display security decision if enabled
+            if self.show_decisions and self.formatter:
+                self.formatter.display_decision(request, decision)
+
             # Log the security decision
             log_data = {
                 "tool_name": tool_name,
@@ -69,6 +79,12 @@ class SecurityEvaluationHandler:
             if decision.action == "deny":
                 logger.warning(
                     "Tool request denied", **log_data, reason=decision.reason
+                )
+            elif decision.action == "sample":
+                logger.info(
+                    "Tool request requires evaluation",
+                    **log_data,
+                    reason=decision.reason,
                 )
             else:
                 logger.debug("Tool request allowed", **log_data, reason=decision.reason)

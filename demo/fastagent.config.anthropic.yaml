@@ -1,31 +1,39 @@
-# FastAgent Configuration for Superego MCP Demo
-# This configures FastAgent to connect to our Superego MCP server via STDIO transport
+# FastAgent Configuration for Superego MCP Demo - Anthropic Provider
+# This configures FastAgent to use Anthropic Claude models with Superego MCP server
+
+# Anthropic provider configuration
+anthropic:
+  api_key: "${ANTHROPIC_API_KEY}"
+  base_url: "https://api.anthropic.com/v1"
 
 mcp:
   servers:
     superego:
-      # STDIO transport configuration for local MCP server
+      # STDIO transport configuration for local MCP server  
       command: "uv"
-      args: ["run", "python", "-m", "superego_mcp.main"]
-      cwd: "."
+      args: ["run", "python", "-m", "superego_mcp.stdio_main"]
+      cwd: "${PROJECT_ROOT}"  # Will be set dynamically by demo script
       env:
         SUPEREGO_LOG_LEVEL: "INFO"
         SUPEREGO_CONFIG_PATH: "./config"
   
-  # Sampling configuration - use a local model for evaluation
+  # Sampling configuration - use Anthropic Claude models
   sampling:
-    model: "claude-3-5-sonnet-20241022"  # Use Claude for sampling decisions
+    model: "claude-3-5-sonnet-20241022"  # Primary Claude model
     max_tokens: 2048
     temperature: 0.1
+    # Alternative models you can try:
+    # model: "claude-3-5-haiku-20241022"    # Faster, cheaper
+    # model: "claude-3-opus-20240229"       # Most capable (if available)
 
 # Agent configuration
 agent:
-  name: "superego-security-demo"
-  description: "Demo agent showcasing Superego MCP server security evaluation"
+  name: "superego-security-demo-anthropic"
+  description: "Demo agent using Anthropic Claude with Superego MCP security evaluation"
   
   # System prompt for the agent
   system_prompt: |
-    You are a security-aware demo agent that works with the Superego MCP security system.
+    You are a security-aware demo agent powered by Anthropic's Claude that works with the Superego MCP security system.
     
     Your role is to demonstrate how AI tool requests are evaluated for security compliance.
     When you need to use tools, the Superego MCP server will intercept and evaluate each request.
@@ -35,6 +43,7 @@ agent:
     2. Show understanding of security implications  
     3. Demonstrate various types of operations (safe, dangerous, complex)
     4. Respect security decisions and explain why certain operations might be blocked
+    5. Leverage Claude's reasoning capabilities to explain security concepts clearly
     
     Available operations to demonstrate:
     - File operations: read_file, write_file, delete_file
@@ -42,7 +51,7 @@ agent:
     - Network operations: fetch_url, send_request
     - Search operations: search_files, grep_content
     
-    Always be educational and explain security concepts to users.
+    Always be educational and explain security concepts to users with Claude's thoughtful analysis.
 
 # Demo scenarios configuration
 demo:
@@ -84,3 +93,4 @@ logging:
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   show_mcp_traffic: true
   show_security_decisions: true
+  provider: "anthropic"

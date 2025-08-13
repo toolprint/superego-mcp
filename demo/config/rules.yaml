@@ -1,0 +1,19 @@
+rules:
+- action: allow
+  conditions:
+    tool_name: read_file|list_files|search_files
+  id: allow_safe_reads
+  priority: 10
+  reason: Safe file reading operations
+- action: deny
+  conditions:
+    parameters: sudo|rm -rf|/etc/passwd|/etc/shadow
+  id: block_dangerous_system
+  priority: 5
+  reason: Dangerous system operations blocked
+- action: sample
+  conditions:
+    tool_name: write_file|execute_command|fetch_url
+  id: evaluate_complex_ops
+  priority: 15
+  reason: Complex operations require evaluation

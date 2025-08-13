@@ -172,7 +172,7 @@ class SecurityRule(BaseModel):
 class Decision(BaseModel):
     """Domain model for security decisions"""
 
-    action: Literal["allow", "deny"]
+    action: Literal["allow", "deny", "sample"]
     reason: str
     rule_id: str | None = None
     confidence: float = Field(..., ge=0.0, le=1.0)
@@ -181,6 +181,13 @@ class Decision(BaseModel):
     ai_provider: str | None = None
     ai_model: str | None = None
     risk_factors: list[str] = Field(default_factory=list)
+    # Sample-specific fields
+    requires_approval: bool = Field(
+        default=False, description="Whether this decision requires user approval"
+    )
+    ai_evaluation: dict[str, Any] | None = Field(
+        default=None, description="AI evaluation results for sample actions"
+    )
 
 
 class AuditEntry(BaseModel):

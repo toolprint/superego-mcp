@@ -8,6 +8,7 @@ from fastmcp import Context, FastMCP
 from ..domain.models import ToolRequest
 from ..domain.security_policy import SecurityPolicyEngine
 from ..infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
+from ..infrastructure.security_formatter import SecurityDecisionFormatter
 
 # Initialize FastMCP server with sampling support
 mcp: FastMCP = FastMCP(
@@ -20,6 +21,7 @@ security_policy: SecurityPolicyEngine | None = None
 audit_logger: AuditLogger | None = None
 error_handler: ErrorHandler | None = None
 health_monitor: HealthMonitor | None = None
+decision_formatter: SecurityDecisionFormatter | None = None
 
 
 @mcp.tool
@@ -47,6 +49,10 @@ async def evaluate_tool_request(
         if security_policy is None:
             raise RuntimeError("Security policy engine not initialized")
         decision = await security_policy.evaluate(request)
+
+        # Display security decision if formatter is available
+        if decision_formatter is not None:
+            decision_formatter.display_decision(request, decision)
 
         # Extract rule matches for audit trail
         rule_matches = []
@@ -234,15 +240,22 @@ async def create_server(
     audit_log: AuditLogger,
     err_handler: ErrorHandler,
     health_mon: HealthMonitor,
+    show_decisions: bool = True,
 ) -> FastMCP:
     """Create and configure MCP server with dependencies"""
 
     # Inject dependencies into global scope (for Day 1 simplicity)
-    global security_policy, audit_logger, error_handler, health_monitor
+    global \
+        security_policy, \
+        audit_logger, \
+        error_handler, \
+        health_monitor, \
+        decision_formatter
     security_policy = security_policy_engine
     audit_logger = audit_log
     error_handler = err_handler
     health_monitor = health_mon
+    decision_formatter = SecurityDecisionFormatter() if show_decisions else None
 
     return mcp
 

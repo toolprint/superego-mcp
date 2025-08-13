@@ -3,6 +3,7 @@
 import re
 import time
 from pathlib import Path
+from typing import Literal
 
 from .models import Decision, SecurityRule, ToolAction, ToolRequest
 from .repositories import RuleRepository
@@ -91,17 +92,15 @@ class RuleEngine:
         Returns:
             Decision with the appropriate action
         """
-        action_mapping = {
-            ToolAction.ALLOW: "allow",
-            ToolAction.DENY: "deny",
-            ToolAction.SAMPLE: "allow",  # For now, sample actions are treated as allow
-        }
-
-        action = action_mapping.get(rule.action, "deny")
-        # action_mapping only contains 'allow' and 'deny', so this is safe
-        from typing import Literal, cast
-
-        action = cast(Literal["allow", "deny"], action)
+        # Handle different rule actions
+        action: Literal["allow", "deny", "sample"]
+        if rule.action == ToolAction.ALLOW:
+            action = "allow"
+        elif rule.action == ToolAction.DENY:
+            action = "deny"
+        elif rule.action == ToolAction.SAMPLE:
+            # Sample actions should trigger AI evaluation, not auto-approve
+            action = "sample"
         reason = rule.reason or f"Action {rule.action.value} applied by rule {rule.id}"
 
         return Decision(
@@ -149,8 +148,19 @@ class InterceptionService:
         if self.security_policy_engine:
             return await self.security_policy_engine.evaluate(request)
         elif self.rule_engine:
-            # Backward compatibility
-            return self.rule_engine.evaluate_request(request)
+            # Get initial decision from rule engine
+            decision = self.rule_engine.evaluate_request(request)
+
+            # If it's a sample action, we need to handle it specially
+            if decision.action == "sample":
+                # For now, mark it as requiring approval but allow it
+                # In a full implementation, this would trigger AI evaluation
+                decision.requires_approval = True
+                decision.reason = f"{decision.reason} (Sample action - would trigger AI evaluation in full implementation)"
+                # For demo purposes, we'll allow it but show it's a sample
+                decision.action = "allow"
+
+            return decision
         else:
             raise ValueError("InterceptionService not properly initialized")
 

@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from superego_mcp.domain.models import Decision, ToolRequest
 from superego_mcp.domain.services import InterceptionService
 from superego_mcp.infrastructure.config import ServerConfig
+from superego_mcp.infrastructure.security_formatter import SecurityDecisionFormatter
 
 logger = structlog.get_logger(__name__)
 
@@ -28,15 +29,23 @@ class EvaluateRequest(BaseModel):
 class SuperegoMCPServer:
     """FastMCP server for Superego tool interception."""
 
-    def __init__(self, interception_service: InterceptionService, config: ServerConfig):
+    def __init__(
+        self,
+        interception_service: InterceptionService,
+        config: ServerConfig,
+        show_decisions: bool = True,
+    ):
         """Initialize the MCP server.
 
         Args:
             interception_service: Service for handling tool interception
             config: Server configuration
+            show_decisions: Whether to display security decisions
         """
         self.interception_service = interception_service
         self.config = config
+        self.show_decisions = show_decisions
+        self.formatter = SecurityDecisionFormatter() if show_decisions else None
         self.app: FastMCP = FastMCP("superego-mcp")
         self._setup_routes()
 
@@ -70,6 +79,10 @@ class SuperegoMCPServer:
             )
 
             decision = await self.interception_service.evaluate_request(tool_request)
+
+            # Display security decision if enabled
+            if self.show_decisions and self.formatter:
+                self.formatter.display_decision(tool_request, decision)
 
             logger.info(
                 "Tool request evaluated",
