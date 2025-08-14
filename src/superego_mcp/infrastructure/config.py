@@ -9,6 +9,53 @@ from pydantic import BaseModel, Field
 from ..infrastructure.ai_service import SamplingConfig
 
 
+class CLIProviderConfig(BaseModel):
+    """Configuration for CLI-based inference providers."""
+
+    name: str
+    enabled: bool = True
+    type: str = "claude"  # CLI type: "claude", etc.
+    command: str = "claude"  # Command to execute
+    model: str | None = None
+    system_prompt: str | None = Field(
+        default=None, description="System prompt to append to CLI requests"
+    )
+    api_key_env_var: str = Field(
+        default="ANTHROPIC_API_KEY",
+        description="Environment variable containing API key",
+    )
+    max_retries: int = Field(default=2, description="Maximum retry attempts")
+    retry_delay_ms: int = Field(
+        default=1000, description="Delay between retries in milliseconds"
+    )
+    timeout_seconds: int = Field(default=10, description="Timeout for CLI requests")
+
+
+class InferenceConfig(BaseModel):
+    """Configuration for the inference system."""
+
+    # Default timeout for all inference requests
+    timeout_seconds: int = Field(
+        default=10, description="Default timeout for inference requests"
+    )
+
+    # Provider preference order (first successful wins)
+    provider_preference: list[str] = Field(
+        default=["mcp_sampling"], description="Order of providers to try for inference"
+    )
+
+    # CLI provider configurations
+    cli_providers: list[CLIProviderConfig] = Field(
+        default_factory=list, description="CLI provider configurations"
+    )
+
+    # Future: API provider configurations
+    api_providers: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Direct API provider configurations (future use)",
+    )
+
+
 class TransportConfig(BaseModel):
     """Individual transport configuration."""
 
@@ -161,9 +208,14 @@ class ServerConfig(BaseModel):
         default=100, description="Requests per minute limit"
     )
 
-    # AI Sampling configuration
+    # AI Sampling configuration (legacy - maintained for backward compatibility)
     ai_sampling: SamplingConfig = Field(
         default_factory=SamplingConfig, description="AI sampling configuration"
+    )
+
+    # Inference system configuration (new extensible system)
+    inference: InferenceConfig = Field(
+        default_factory=InferenceConfig, description="Inference provider configuration"
     )
 
     # Multi-transport configuration

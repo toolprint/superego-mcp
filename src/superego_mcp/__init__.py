@@ -9,7 +9,7 @@ __version__ = "0.1.0"
 __author__ = "Superego MCP Team"
 __email__ = "team@superego-mcp.dev"
 
-from superego_mcp.domain.models import (
+from .domain.models import (
     AuditEntry,
     Decision,
     ErrorCode,

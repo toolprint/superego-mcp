@@ -1,4 +1,5 @@
-# Superego MCP Server Configuration
+# Example Superego MCP Server Configuration with CLI Provider
+# This demonstrates how to configure the new inference system with Claude CLI
 
 # Server settings
 host: "localhost"
@@ -37,35 +38,54 @@ inference:
   
   # Provider preference order (first successful wins)
   provider_preference:
-    - "mcp_sampling"    # Use existing MCP sampling as primary
-    # - "claude_cli"    # Uncomment to enable CLI provider
+    - "claude_cli"      # Try CLI first for faster response
+    - "mcp_sampling"    # Fallback to MCP sampling
   
   # CLI provider configurations
   cli_providers:
     - name: "claude_cli"
-      enabled: false     # Set to true to enable CLI provider
+      enabled: true       # Enable CLI provider
       type: "claude"
       command: "claude"
       model: "claude-3-sonnet-20240229"
       system_prompt: |
         You are a security evaluation system for tool execution requests.
-        Respond with JSON containing:
-        - decision (allow/deny)
-        - confidence (0.0-1.0)
-        - reasoning (brief explanation)
-        - risk_factors (array of identified risks)
+        
+        Your role is to analyze tool requests from AI agents and determine if they should be allowed or denied based on security implications.
+        
+        Respond with valid JSON containing:
+        - decision: "allow" or "deny"
+        - confidence: float between 0.0 and 1.0
+        - reasoning: brief explanation of your decision
+        - risk_factors: array of identified security risks (can be empty)
+        
+        Security considerations:
+        1. File system access outside safe directories
+        2. Network operations to external services
+        3. System command execution
+        4. Data modification or deletion
+        5. Privilege escalation attempts
+        6. Information disclosure risks
         
         Example response:
         {
           "decision": "allow",
           "confidence": 0.8,
-          "reasoning": "File read operation in safe directory with no sensitive data exposure risk",
+          "reasoning": "File read operation in user directory with no sensitive data exposure risk",
           "risk_factors": []
+        }
+        
+        Example denial:
+        {
+          "decision": "deny", 
+          "confidence": 0.9,
+          "reasoning": "Attempt to access system configuration files outside user scope",
+          "risk_factors": ["unauthorized_access", "sensitive_data"]
         }
       api_key_env_var: "ANTHROPIC_API_KEY"
       max_retries: 2
       retry_delay_ms: 1000
-      timeout_seconds: 10
+      timeout_seconds: 8
   
   # Future: Direct API provider configurations
   api_providers: []

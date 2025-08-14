@@ -29,6 +29,7 @@ class SecurityPolicyEngine:
         health_monitor=None,
         ai_service_manager=None,
         prompt_builder=None,
+        inference_manager=None,
     ):
         self.rules_file = rules_file
         self.rules: list[SecurityRule] = []
@@ -38,6 +39,7 @@ class SecurityPolicyEngine:
         self.health_monitor = health_monitor
         self.ai_service_manager = ai_service_manager
         self.prompt_builder = prompt_builder
+        self.inference_manager = inference_manager  # New inference system
         self.pattern_engine = PatternEngine()
         self.load_rules()
 
@@ -181,19 +183,79 @@ class SecurityPolicyEngine:
     async def _handle_sampling(
         self, request: ToolRequest, rule: SecurityRule, start_time: float
     ) -> Decision:
-        """Handle sampling action with AI evaluation"""
-        # Check if AI service is available
-        if not self.ai_service_manager or not self.prompt_builder:
-            # Fallback to deny if AI not configured (fail closed for security)
+        """Handle sampling action with AI evaluation using new inference system"""
+        # Check if new inference system is available
+        if self.inference_manager:
+            return await self._handle_sampling_with_inference_manager(
+                request, rule, start_time
+            )
+
+        # Fallback to legacy implementation for backward compatibility
+        if self.ai_service_manager and self.prompt_builder:
+            return await self._handle_sampling_legacy(request, rule, start_time)
+
+        # No inference available - fail closed
+        processing_time_ms = max(1, int((time.perf_counter() - start_time) * 1000))
+        return Decision(
+            action="deny",
+            reason=f"Rule {rule.id} requires inference but no providers configured",
+            rule_id=rule.id,
+            confidence=0.6,
+            processing_time_ms=processing_time_ms,
+        )
+
+    async def _handle_sampling_with_inference_manager(
+        self, request: ToolRequest, rule: SecurityRule, start_time: float
+    ) -> Decision:
+        """Handle sampling using the new inference system"""
+        try:
+            # Build secure prompt
+            prompt = self.prompt_builder.build_evaluation_prompt(request, rule)
+
+            # Generate cache key
+            cache_key = self._generate_cache_key(request, rule)
+
+            # Get inference decision using the new system
+            inference_decision = await self.inference_manager.evaluate(
+                request=request, rule=rule, prompt=prompt, cache_key=cache_key
+            )
+
+            # Convert to domain Decision
+            processing_time_ms = max(1, int((time.perf_counter() - start_time) * 1000))
+
+            return Decision(
+                action=inference_decision.decision,
+                reason=inference_decision.reasoning,
+                rule_id=rule.id,
+                confidence=inference_decision.confidence,
+                processing_time_ms=processing_time_ms,
+                ai_provider=inference_decision.provider,
+                ai_model=inference_decision.model,
+                risk_factors=inference_decision.risk_factors,
+            )
+
+        except Exception as e:
+            self.logger.error(
+                "Inference evaluation failed",
+                error=str(e),
+                rule_id=rule.id,
+                tool=request.tool_name,
+            )
+
+            # Fail closed
             processing_time_ms = max(1, int((time.perf_counter() - start_time) * 1000))
             return Decision(
                 action="deny",
-                reason=f"Rule {rule.id} requires AI sampling but AI service not configured",
+                reason=f"Inference evaluation failed for rule {rule.id} - denying for security",
                 rule_id=rule.id,
-                confidence=0.6,
+                confidence=0.5,
                 processing_time_ms=processing_time_ms,
             )
 
+    async def _handle_sampling_legacy(
+        self, request: ToolRequest, rule: SecurityRule, start_time: float
+    ) -> Decision:
+        """Handle sampling action with legacy AI evaluation (backward compatibility)"""
         try:
             # Build secure prompt
             prompt = self.prompt_builder.build_evaluation_prompt(request, rule)
@@ -201,7 +263,7 @@ class SecurityPolicyEngine:
             # Generate cache key from request
             cache_key = self._generate_cache_key(request, rule)
 
-            # Get AI evaluation
+            # Get AI evaluation using legacy system
             ai_decision = await self.ai_service_manager.evaluate_with_ai(
                 prompt=prompt, cache_key=cache_key
             )
@@ -215,14 +277,14 @@ class SecurityPolicyEngine:
                 rule_id=rule.id,
                 confidence=ai_decision.confidence,
                 processing_time_ms=processing_time_ms,
-                ai_provider=ai_decision.provider.value,
+                ai_provider=ai_decision.provider if isinstance(ai_decision.provider, str) else ai_decision.provider.value,
                 ai_model=ai_decision.model,
                 risk_factors=ai_decision.risk_factors,
             )
 
         except Exception as e:
             self.logger.error(
-                "AI sampling failed",
+                "Legacy AI sampling failed",
                 error=str(e),
                 rule_id=rule.id,
                 tool=request.tool_name,
@@ -371,8 +433,72 @@ class SecurityPolicyEngine:
             "pattern_engine": self.pattern_engine.get_cache_stats(),
         }
 
-        # Add AI service health if available
+        # Add AI service health if available (legacy)
         if self.ai_service_manager:
             health_info["ai_service"] = self.ai_service_manager.get_health_status()
+
+        # Add inference manager health if available (new system)
+        if self.inference_manager:
+            try:
+                import asyncio
+
+                # Get the current event loop, or create a new one if none exists
+                try:
+                    loop = asyncio.get_running_loop()
+                    # We're in an async context, but this is a sync method
+                    # For health checks, we'll provide a simplified status
+                    health_info["inference_system"] = {
+                        "available": True,
+                        "total_providers": len(self.inference_manager.providers),
+                        "provider_names": list(self.inference_manager.providers.keys()),
+                        "note": "Use async health_check_async() for detailed provider status",
+                    }
+                except RuntimeError:
+                    # No event loop, safe to run async code
+                    import asyncio
+
+                    async def get_inference_health():
+                        return await self.inference_manager.health_check()
+
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        inference_health = loop.run_until_complete(
+                            get_inference_health()
+                        )
+                        health_info["inference_system"] = inference_health
+                        loop.close()
+                    except Exception as e:
+                        health_info["inference_system"] = {
+                            "available": True,
+                            "error": str(e),
+                            "total_providers": len(self.inference_manager.providers),
+                            "provider_names": list(
+                                self.inference_manager.providers.keys()
+                            ),
+                        }
+            except Exception as e:
+                health_info["inference_system"] = {"available": False, "error": str(e)}
+
+        return health_info
+
+    async def health_check_async(self) -> dict[str, Any]:
+        """Provide detailed async health status including inference providers"""
+        # Get base health info
+        health_info = self.health_check()
+
+        # Add detailed inference manager health if available
+        if self.inference_manager:
+            try:
+                inference_health = await self.inference_manager.health_check()
+                health_info["inference_system"] = inference_health
+            except Exception as e:
+                health_info["inference_system"] = {
+                    "available": False,
+                    "error": str(e),
+                    "total_providers": len(self.inference_manager.providers)
+                    if self.inference_manager.providers
+                    else 0,
+                }
 
         return health_info

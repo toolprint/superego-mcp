@@ -1,194 +1,260 @@
-# Superego MCP + FastAgent Demo
+# Superego MCP Demo Suite
 
-This directory contains demo implementations showcasing the integration between FastAgent and the Superego MCP Server for AI tool request security evaluation.
+This directory contains a comprehensive suite of demonstrations showcasing the Superego MCP security evaluation system using a standardized hook-based test harness.
 
-## Overview
+## 🚀 Quick Start
 
-The demo demonstrates how Superego MCP server evaluates AI tool requests for security compliance when integrated with FastAgent. All tool requests are intercepted and evaluated in real-time, with decisions to allow, block, or sample operations based on security policies.
+### No External Dependencies Required!
+- ✅ No API keys needed
+- ✅ No Claude Code installation required
+- ✅ Works completely standalone
+- ✅ Consistent behavior across all demos
 
-## Files
-
-### Configuration
-- `fastagent.config.yaml` - FastAgent configuration with Superego MCP server setup
-- `security_scenarios.py` - Comprehensive security test scenarios
-
-### Demo Implementations  
-- `fastagent_demo.py` - Full FastAgent integration demo (requires fast-agent-mcp package)
-- `simple_fastagent_demo.py` - Simplified demo using FastAgent CLI
-- `client.py` - Legacy HTTP client demo (for reference)
-
-### Generated Files
-- `demo_agent.py` - Auto-generated FastAgent agent definition
-- `__init__.py` - Package initialization
-
-## Setup
-
-1. **Install dependencies** (from project root):
-   ```bash
-   uv sync --extra demo
-   ```
-
-2. **Verify FastAgent installation**:
-   ```bash
-   uv run --extra demo fast-agent --version
-   ```
-
-3. **Start Superego MCP server** (in another terminal):
-   ```bash
-   uv run superego-mcp
-   ```
-
-## Running Demos
-
-### Option 1: Simple FastAgent Demo (Recommended)
+### Start Here:
 ```bash
 cd demo
-uv run --extra demo python simple_fastagent_demo.py
+python demo_dashboard.py
 ```
 
-This provides:
-- Automated security scenarios testing
-- Interactive FastAgent chat mode
-- Real-time security evaluation display
+The Demo Dashboard provides an interactive menu to explore all available demos with descriptions and guided navigation.
 
-### Option 2: Full FastAgent Integration
+## 📁 Demo Architecture
+
+All demos follow a standardized architecture using the hook-based test harness:
+
+```
+demo/
+├── base_demo.py              # Base class all demos inherit from
+├── demo_utils.py             # Shared utilities and helpers
+├── demo_dashboard.py         # Central navigation hub
+│
+├── claude_code_demo.py       # Claude Code patterns demo
+├── fastagent_demo.py         # FastAgent integration patterns
+├── simple_fastagent_demo.py  # Simplified FastAgent demo
+├── security_scenarios.py     # Comprehensive security scenarios
+├── interactive_hook_demo.py  # Advanced interactive demo
+├── scenario_runner.py        # Batch execution with metrics
+├── hook_simulator.py         # Low-level hook testing
+│
+└── config/                   # Configuration files
+    ├── rules.yaml           # Default security rules
+    └── rules-cli-demo.yaml  # CLI demo rules
+```
+
+## 🎯 Available Demos
+
+### Basic Demos (Beginner-Friendly)
+
+#### 1. **Simple FastAgent Demo** (`simple_fastagent_demo.py`)
+- **Time**: 5 minutes
+- **Features**: Quick demo mode, essential scenarios, simple interface
 ```bash
-cd demo  
-uv run --extra demo python fastagent_demo.py
+python simple_fastagent_demo.py
 ```
 
-Requires the full fast-agent-mcp package with MCP sampling support.
-
-### Option 3: Using justfile Tasks
+#### 2. **Claude Code Demo** (`claude_code_demo.py`)
+- **Time**: 5-10 minutes
+- **Features**: Interactive request builder, pre-defined scenarios, real-time feedback
 ```bash
-# From project root
-just demo-fastagent-simple    # Run simple demo
-just demo-fastagent-full      # Run full demo
-just demo-scenarios           # Run just the scenarios
+python claude_code_demo.py --interactive
 ```
 
-## Security Scenarios
+### Intermediate Demos
 
-The demo includes comprehensive security scenarios in four categories:
-
-### 🟢 Safe Operations (Should be ALLOWED)
-- Reading user documents
-- Directory listing  
-- Text search in project files
-- Basic system information
-- File hash calculation
-
-### 🔴 Dangerous Operations (Should be BLOCKED)
-- Deleting system files (`/etc/passwd`)
-- Destructive commands (`sudo rm -rf /`)
-- Privilege escalation (`sudo su -`)
-- Modifying system permissions
-- Stopping critical services
-
-### 🟡 Complex Operations (May require SAMPLING/APPROVAL)
-- Writing executable scripts
-- External API requests
-- Database connections
-- Package installation
-- File encryption
-
-### ⚠️ Suspicious Operations (Should be BLOCKED or heavily scrutinized)
-- Obfuscated commands (base64 encoded)
-- Credential harvesting attempts
-- Covert network communications
-- System fingerprinting
-- Log manipulation
-
-## Configuration Details
-
-### MCP Server Configuration
-The `fastagent.config.yaml` configures FastAgent to connect to Superego MCP via STDIO transport:
-
-```yaml
-mcp:
-  servers:
-    superego:
-      command: "uv"
-      args: ["run", "python", "-m", "superego_mcp.main"]
-      cwd: "/path/to/superego-mcp"
-  sampling:
-    model: "claude-3-5-sonnet-20241022"
-```
-
-### Agent System Prompt
-The demo agent is configured to:
-- Explain actions before using tools
-- Show understanding of security implications
-- Demonstrate various operation types
-- Respect security decisions
-- Be educational about security concepts
-
-## Expected Behavior
-
-When you run the demo, you should see:
-
-1. **Security Evaluation in Real-Time**: Every tool request shows the security decision (ALLOW/BLOCK/SAMPLE) with reasoning
-
-2. **Rule Matching**: Security rules that match are displayed with explanations
-
-3. **Confidence Scores**: Each decision includes a confidence level
-
-4. **Processing Time**: Performance metrics for evaluation speed
-
-5. **Audit Logging**: All decisions are logged for compliance and monitoring
-
-## Troubleshooting
-
-### FastAgent Not Available
-If you see "FastAgent not available":
+#### 3. **FastAgent Demo** (`fastagent_demo.py`)
+- **Time**: 10-15 minutes
+- **Features**: Category-based scenarios, risk assessment, comprehensive patterns
 ```bash
-uv sync --extra demo
+python fastagent_demo.py
 ```
 
-### MCP Server Connection Issues
-Ensure the Superego MCP server is running:
+#### 4. **Security Scenarios Demo** (`security_scenarios.py`)
+- **Time**: 15-20 minutes
+- **Features**: 40+ scenarios, risk matrix analysis, scenario browser
 ```bash
-uv run superego-mcp
+python security_scenarios.py
 ```
 
-Check the server is responding:
+### Advanced Demos
+
+#### 5. **Interactive Hook Demo** (`interactive_hook_demo.py`)
+- **Time**: Variable
+- **Features**: Menu-driven interface, scenario templates, session statistics
 ```bash
-curl http://localhost:8000/health
+python interactive_hook_demo.py
 ```
 
-### Configuration Issues
-Verify the configuration file path and MCP server command in `fastagent.config.yaml`.
+#### 6. **Scenario Runner** (`scenario_runner.py`)
+- **Time**: 20-30 minutes
+- **Features**: Batch execution, performance metrics, multiple export formats
+```bash
+python scenario_runner.py --output results.html
+```
 
-### Permission Issues
-Make sure you have proper permissions to execute the MCP server and create temporary files.
+## 🛠️ Common Options
 
-## Integration Notes
+All demos support these standard command-line options:
 
-### STDIO Transport
-FastAgent connects to Superego MCP using STDIO transport:
-- MCP server process is spawned by FastAgent
-- Communication happens via stdin/stdout
-- Server process terminates when FastAgent disconnects
+```bash
+--log-level {DEBUG,INFO,WARNING,ERROR}  # Logging verbosity
+--rules PATH                            # Custom security rules
+--output PATH                          # Output file for results
+--session-id ID                        # Custom session ID
+--interactive                          # Interactive mode
+--scenarios PATH                       # Load scenarios from file
+```
 
-### Sampling Support
-When complex operations require evaluation:
-- FastAgent sends sampling request to configured LLM
-- Superego MCP provides security context and evaluation
-- Human approval may be required for high-risk operations
+## 📊 Security Evaluation Categories
 
-### Error Handling
-The demo includes comprehensive error handling:
-- MCP server failures fall back to safe defaults
-- Network issues are handled gracefully
-- Invalid configurations show clear error messages
+The demos evaluate operations across four security levels:
 
-## Educational Value
+### 🟢 Safe Operations
+- File reads in user directories
+- Directory listings
+- Safe shell commands
+- Public API requests
 
-This demo is designed to be educational, showing:
-- How AI agents can be secured with policy-based evaluation
-- Real-world security scenarios and their classifications
-- The balance between functionality and security
-- Best practices for AI tool request interception
-- Compliance and audit logging requirements
+### 🔴 Dangerous Operations  
+- System file modifications
+- Destructive commands
+- Credential access
+- Malicious scripts
 
-Use this demo to understand and demonstrate enterprise-grade AI security practices.
+### 🟡 Complex Operations
+- Package installations
+- API key searches
+- Network requests
+- Archive extractions
+
+### ⚠️ Suspicious Operations
+- Remote code execution
+- Path traversal attempts
+- Data exfiltration
+- Privilege escalation
+
+## 🔧 Extending the Demos
+
+### Creating a Custom Demo
+
+1. Create a new file extending `BaseDemo`:
+
+```python
+from base_demo import BaseDemo
+from demo_utils import Colors, create_demo_header
+
+class MyDemo(BaseDemo):
+    def __init__(self, **kwargs):
+        super().__init__(demo_name="my_demo", **kwargs)
+    
+    def run(self):
+        print(create_demo_header("My Custom Demo"))
+        
+        # Process a tool request
+        self.process_tool_request(
+            tool_name="Read",
+            parameters={"file_path": "test.txt"},
+            description="Test file read"
+        )
+        
+        # Show summary
+        self.display_summary()
+```
+
+2. Add to Demo Dashboard for easy discovery
+
+### Custom Scenarios
+
+Create a JSON file with scenarios:
+
+```json
+[
+  {
+    "tool_name": "Bash",
+    "parameters": {
+      "command": "echo 'Hello World'",
+      "description": "Test echo"
+    },
+    "description": "Safe echo command",
+    "expected_action": "allow"
+  }
+]
+```
+
+Run with:
+```bash
+python scenario_runner.py --scenarios my_scenarios.json
+```
+
+## 📈 Key Features
+
+### Hook-Based Test Harness
+- Simulates Claude Code hook events
+- No external dependencies
+- Consistent behavior
+- Full tool coverage
+
+### Standardized Framework
+- Common base class
+- Shared utilities
+- Consistent CLI options
+- Unified error handling
+
+### Comprehensive Coverage
+- 100+ test scenarios
+- All Claude Code tools
+- Multiple risk levels
+- Edge cases included
+
+### Rich Feedback
+- Real-time decisions
+- Detailed explanations
+- Performance metrics
+- Export capabilities
+
+## 🐛 Troubleshooting
+
+### Import Errors
+```bash
+# Ensure you're in the demo directory
+cd demo
+python <demo_name>.py
+```
+
+### No Output
+```bash
+# Increase log level
+python <demo_name>.py --log-level DEBUG
+```
+
+### Custom Rules Not Working
+```bash
+# Verify rules file path
+python <demo_name>.py --rules ./config/rules.yaml
+```
+
+## 📚 Additional Resources
+
+- **Demo Guide**: See `DEMO_GUIDE.md` for detailed instructions
+- **Hook Documentation**: See `README_CLAUDE_CODE_HOOKS.md`
+- **Security Rules**: Check `config/rules.yaml` for examples
+
+## 🎓 Learning Path
+
+1. **Start**: Demo Dashboard → Simple FastAgent Demo
+2. **Explore**: Interactive Hook Demo → Custom scenarios
+3. **Test**: Security Scenarios → Risk assessment
+4. **Analyze**: Scenario Runner → Performance metrics
+5. **Extend**: Create custom demos → Share with team
+
+## 🤝 Contributing
+
+When adding new demos:
+1. Extend `BaseDemo` for consistency
+2. Use `demo_utils` for common tasks
+3. Add to Demo Dashboard
+4. Update documentation
+5. Test with various scenarios
+
+## 📄 License
+
+See the main project LICENSE file for details.

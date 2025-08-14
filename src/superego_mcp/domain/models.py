@@ -1,7 +1,7 @@
 """Domain models for the Superego MCP Server."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
@@ -58,6 +58,7 @@ class ErrorCode(str, Enum):
 
     RULE_EVALUATION_FAILED = "RULE_EVAL_001"
     AI_SERVICE_UNAVAILABLE = "AI_SVC_001"
+    AI_SERVICE_TIMEOUT = "AI_SVC_002"
     INVALID_CONFIGURATION = "CONFIG_001"
     PARAMETER_VALIDATION_FAILED = "PARAM_001"
     INTERNAL_ERROR = "INTERNAL_001"
@@ -88,7 +89,7 @@ class ToolRequest(BaseModel):
     session_id: str
     agent_id: str
     cwd: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("parameters")
     @classmethod
@@ -142,6 +143,10 @@ class SecurityRule(BaseModel):
     reason: str | None = None
     sampling_guidance: str | None = None
     enabled: bool = Field(default=True, description="Whether the rule is active")
+    inference_provider: str | None = Field(
+        default=None,
+        description="Preferred inference provider for this rule (optional)",
+    )
 
     model_config = {"frozen": True}  # Immutable rules
 
@@ -194,7 +199,7 @@ class AuditEntry(BaseModel):
     """Domain model for audit trail entries"""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     request: ToolRequest
     decision: Decision
     rule_matches: list[str]
@@ -206,13 +211,13 @@ class ComponentHealth(BaseModel):
 
     status: Literal["healthy", "degraded", "unhealthy"]
     message: str | None = None
-    last_check: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_check: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class HealthStatus(BaseModel):
     """Overall system health status with component details and metrics"""
 
     status: Literal["healthy", "degraded", "unhealthy"]
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     components: dict[str, ComponentHealth]
     metrics: dict[str, float | dict[str, Any]]

@@ -12,6 +12,7 @@ from .infrastructure.circuit_breaker import CircuitBreaker
 from .infrastructure.config import ConfigManager
 from .infrastructure.config_watcher import ConfigWatcher
 from .infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
+from .infrastructure.inference import InferenceConfig, InferenceStrategyManager
 from .infrastructure.prompt_builder import SecurePromptBuilder
 
 
@@ -46,7 +47,7 @@ async def async_main() -> None:
     audit_logger = AuditLogger()
     health_monitor = HealthMonitor()
 
-    # Create AI components if enabled
+    # Create AI components if enabled (legacy support)
     ai_service_manager = None
     prompt_builder = None
 
@@ -70,12 +71,47 @@ async def async_main() -> None:
             f"AI sampling enabled with primary provider: {config.ai_sampling.primary_provider}"
         )
 
+    # Create inference system (new extensible system)
+    inference_manager = None
+    if hasattr(config, "inference") and config.inference:
+        # Always create prompt builder if not already created
+        if not prompt_builder:
+            prompt_builder = SecurePromptBuilder()
+
+        # Create inference strategy manager
+        dependencies = {
+            "ai_service_manager": ai_service_manager,
+            "prompt_builder": prompt_builder,
+        }
+
+        inference_manager = InferenceStrategyManager(
+            config=config.inference, dependencies=dependencies
+        )
+
+        print(
+            f"Inference system initialized with {len(inference_manager.providers)} provider(s): {list(inference_manager.providers.keys())}"
+        )
+    elif ai_service_manager and prompt_builder:
+        # Fallback: create minimal inference config for backward compatibility
+        fallback_config = InferenceConfig()
+        dependencies = {
+            "ai_service_manager": ai_service_manager,
+            "prompt_builder": prompt_builder,
+        }
+
+        inference_manager = InferenceStrategyManager(
+            config=fallback_config, dependencies=dependencies
+        )
+
+        print("Inference system initialized in backward compatibility mode")
+
     # Create security policy with all dependencies
     security_policy = SecurityPolicyEngine(
         rules_file=rules_file,
         health_monitor=health_monitor,
         ai_service_manager=ai_service_manager,
         prompt_builder=prompt_builder,
+        inference_manager=inference_manager,
     )
 
     # Create config watcher with reload callback
@@ -164,6 +200,11 @@ async def async_main() -> None:
         if ai_service_manager:
             print("Closing AI service connections...")
             await ai_service_manager.close()
+
+        # Cleanup inference system if initialized
+        if inference_manager:
+            print("Cleaning up inference system...")
+            await inference_manager.cleanup()
 
         print("Server shutdown complete")
 

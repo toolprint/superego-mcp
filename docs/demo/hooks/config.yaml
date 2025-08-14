@@ -1,0 +1,222 @@
+# Claude Code Hook Configuration for Superego MCP
+version: "1.0"
+
+# Global settings
+settings:
+  log_level: "INFO"
+  metrics_enabled: true
+  performance_tracking: true
+
+# Hook definitions
+hooks:
+  # Primary security check hook - evaluates all tool calls
+  - name: "superego-security-check"
+    type: "PreToolUse"
+    enabled: true
+    script: "superego-check.js"
+    description: "Send tool calls to Superego MCP for security evaluation"
+    
+    # Pattern matching for tools to intercept
+    matchers:
+      # Catch all MCP tools from any server
+      - pattern: "mcp__*"
+        type: "tool_name"
+        description: "All MCP protocol tools"
+      
+      # High-risk file operations
+      - pattern: "Write|Edit|MultiEdit|Delete"
+        type: "tool_name"
+        risk_level: "high"
+      
+      # System command execution
+      - pattern: "Bash|Execute|Shell"
+        type: "tool_name"
+        risk_level: "critical"
+      
+      # Network operations
+      - pattern: "WebFetch|WebSearch|HttpRequest"
+        type: "tool_name"
+        risk_level: "medium"
+      
+      # Tool-specific matchers with parameter inspection
+      - tool: "Bash"
+        parameter_patterns:
+          command: ["*sudo*", "*rm -rf*", "*chmod 777*"]
+        risk_level: "critical"
+        action: "always_check"
+    
+    # Hook configuration
+    config:
+      # Superego MCP server endpoints
+      superego_url: "http://localhost:8000"
+      superego_health_check: "http://localhost:8000/health"
+      
+      # Timeouts and retries
+      timeout: 5000  # 5 seconds
+      retry_count: 2
+      retry_delay: 500  # ms
+      
+      # Security settings
+      fail_open: false  # Deny if Superego is unreachable
+      cache_decisions: true
+      cache_ttl: 60000  # 1 minute
+      
+      # Performance optimization
+      batch_requests: true
+      batch_window: 100  # ms
+      max_batch_size: 10
+      
+      # Context enrichment
+      include_context:
+        - "session_id"
+        - "agent_id"
+        - "working_directory"
+        - "user_prompt"
+        - "conversation_history_summary"
+
+  # Audit logging hook - records all tool executions
+  - name: "superego-audit-log"
+    type: "PostToolUse"
+    enabled: true
+    script: "superego-audit.js"
+    description: "Send tool execution results to Superego for audit logging"
+    
+    matchers:
+      # Audit everything
+      - pattern: "*"
+        type: "tool_name"
+    
+    config:
+      superego_url: "http://localhost:8000"
+      endpoint: "/api/v1/audit"
+      
+      # Async logging - don't block on audit
+      async: true
+      timeout: 2000
+      
+      # Include execution details
+      include_result: true
+      include_error_details: true
+      include_performance_metrics: true
+      
+      # Privacy settings
+      redact_sensitive_data: true
+      sensitive_patterns:
+        - "password"
+        - "api_key"
+        - "secret"
+        - "token"
+
+  # Specialized hook for high-risk operations
+  - name: "superego-high-risk-approval"
+    type: "PreToolUse"
+    enabled: false  # Enable for production
+    script: "superego-approval.js"
+    description: "Require manual approval for high-risk operations"
+    
+    matchers:
+      - tool: "Bash"
+        parameter_patterns:
+          command: ["*production*", "*delete*", "*DROP TABLE*"]
+      - tool: "Write"
+        parameter_patterns:
+          file_path: ["*.env", "*config*", "*.pem", "*.key"]
+    
+    config:
+      superego_url: "http://localhost:8000"
+      approval_endpoint: "/api/v1/request-approval"
+      approval_timeout: 300000  # 5 minutes
+      notification_channels:
+        - "slack"
+        - "email"
+
+  # Performance monitoring hook
+  - name: "superego-performance-monitor"
+    type: "PostToolUse"
+    enabled: true
+    script: "superego-performance.js"
+    description: "Track tool execution performance"
+    
+    matchers:
+      - pattern: "*"
+        type: "tool_name"
+    
+    config:
+      threshold_ms: 1000
+      alert_on_slow: true
+      collect_metrics:
+        - "execution_time"
+        - "memory_usage"
+        - "error_rate"
+
+# Environment-specific overrides
+environments:
+  development:
+    hooks:
+      - name: "superego-security-check"
+        config:
+          fail_open: true  # More permissive in dev
+          superego_url: "http://localhost:8000"
+  
+  staging:
+    hooks:
+      - name: "superego-security-check"
+        config:
+          fail_open: false
+          superego_url: "https://staging-superego.internal:8443"
+          ssl_verify: true
+  
+  production:
+    hooks:
+      - name: "superego-security-check"
+        enabled: true
+        config:
+          fail_open: false
+          superego_url: "https://superego.internal:8443"
+          ssl_verify: true
+          require_auth: true
+          auth_token: "${SUPEREGO_AUTH_TOKEN}"
+      - name: "superego-high-risk-approval"
+        enabled: true
+
+# Alert configurations
+alerts:
+  - name: "security-violation"
+    conditions:
+      - "decision == 'DENY'"
+      - "risk_level == 'critical'"
+    actions:
+      - type: "log"
+        level: "ERROR"
+      - type: "notification"
+        channel: "security-team"
+  
+  - name: "performance-degradation"
+    conditions:
+      - "latency_ms > 5000"
+    actions:
+      - type: "log"
+        level: "WARN"
+      - type: "metric"
+        name: "hook.performance.slow"
+
+# Feature flags
+features:
+  # Enable AI evaluation for ambiguous cases
+  ai_evaluation:
+    enabled: true
+    model: "gpt-4"
+    temperature: 0.3
+    max_tokens: 500
+  
+  # Enable caching for performance
+  decision_cache:
+    enabled: true
+    ttl: 60000
+    max_size: 1000
+  
+  # Enable detailed telemetry
+  telemetry:
+    enabled: true
+    sample_rate: 0.1  # 10% sampling
+    export_interval: 60000  # 1 minute

@@ -55,6 +55,7 @@ dev = [
 
 [project.scripts]
 superego-mcp = "superego_mcp.main:cli_main"
+superego-eval = "superego_mcp.cli_eval:main"
 
 [project.urls]
 Homepage = "https://github.com/your-org/superego-mcp"
