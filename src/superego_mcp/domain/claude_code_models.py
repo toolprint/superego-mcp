@@ -184,8 +184,7 @@ class HookSpecificOutput(BaseModel):
     """Base model for hook-specific output data."""
 
     hook_event_name: HookEventName = Field(
-        alias="hookEventName",
-        description="Type of hook event"
+        alias="hookEventName", description="Type of hook event"
     )
 
     model_config = {"populate_by_name": True}
@@ -194,17 +193,15 @@ class HookSpecificOutput(BaseModel):
 class PreToolUseHookSpecificOutput(HookSpecificOutput):
     """Hook-specific output for PreToolUse events."""
 
-    hook_event_name: Literal["PreToolUse"] = Field(
-        default="PreToolUse",
-        alias="hookEventName"
+    hook_event_name: HookEventName = Field(
+        default=HookEventName.PRE_TOOL_USE, alias="hookEventName"
     )
     permission_decision: PermissionDecision = Field(
-        alias="permissionDecision",
-        description="Permission decision for the tool call"
+        alias="permissionDecision", description="Permission decision for the tool call"
     )
     permission_decision_reason: str = Field(
         alias="permissionDecisionReason",
-        description="Reason for the permission decision (shown to user)"
+        description="Reason for the permission decision (shown to user)",
     )
 
 
@@ -215,18 +212,17 @@ class PreToolUseOutput(BaseModel):
     """Output model for PreToolUse hook responses matching Claude Code specification."""
 
     hook_specific_output: PreToolUseHookSpecificOutput = Field(
-        alias="hookSpecificOutput",
-        description="Hook-specific output data"
+        alias="hookSpecificOutput", description="Hook-specific output data"
     )
 
     # Deprecated fields for backward compatibility
     decision: Literal["approve", "block"] | None = Field(
         default=None,
-        description="Deprecated: Use hookSpecificOutput.permissionDecision instead"
+        description="Deprecated: Use hookSpecificOutput.permissionDecision instead",
     )
     reason: str | None = Field(
         default=None,
-        description="Deprecated: Use hookSpecificOutput.permissionDecisionReason instead"
+        description="Deprecated: Use hookSpecificOutput.permissionDecisionReason instead",
     )
 
     model_config = {"populate_by_name": True}
@@ -362,7 +358,7 @@ def validate_hook_input(data: dict[str, Any]) -> HookInput:
         raise ValueError(f"Unsupported hook event type: {event_name}") from None
 
     # Map event types to their corresponding input models
-    model_map = {
+    model_map: dict[HookEventName, type[HookInput]] = {
         HookEventName.PRE_TOOL_USE: PreToolUseInput,
         HookEventName.POST_TOOL_USE: PostToolUseInput,
         HookEventName.NOTIFICATION: NotificationInput,
@@ -375,7 +371,7 @@ def validate_hook_input(data: dict[str, Any]) -> HookInput:
     return model_class.model_validate(data)
 
 
-def create_hook_output(event_type: HookEventName, **kwargs) -> HookOutput:
+def create_hook_output(event_type: HookEventName, **kwargs: Any) -> HookOutput:
     """
     Create appropriate hook output model based on event type.
 
@@ -392,7 +388,9 @@ def create_hook_output(event_type: HookEventName, **kwargs) -> HookOutput:
     # Special handling for PreToolUse to construct the nested structure
     if event_type == HookEventName.PRE_TOOL_USE:
         # Extract hook-specific parameters
-        permission_decision = kwargs.pop("permission_decision", PermissionDecision.ALLOW)
+        permission_decision = kwargs.pop(
+            "permission_decision", PermissionDecision.ALLOW
+        )
         permission_decision_reason = kwargs.pop("permission_decision_reason", "")
 
         # Extract deprecated parameters if provided
@@ -402,17 +400,17 @@ def create_hook_output(event_type: HookEventName, **kwargs) -> HookOutput:
         # Create the hook-specific output
         hook_specific_output = PreToolUseHookSpecificOutput(
             permissionDecision=permission_decision,
-            permissionDecisionReason=permission_decision_reason
+            permissionDecisionReason=permission_decision_reason,
         )
 
         return PreToolUseOutput(
             hookSpecificOutput=hook_specific_output,
             decision=decision,
             reason=reason,
-            **kwargs
+            **kwargs,
         )
 
-    model_map = {
+    model_map: dict[HookEventName, type[HookOutput]] = {
         HookEventName.POST_TOOL_USE: PostToolUseOutput,
         HookEventName.NOTIFICATION: NotificationOutput,
         HookEventName.USER_PROMPT_SUBMIT: UserPromptSubmitOutput,

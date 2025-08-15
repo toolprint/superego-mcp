@@ -97,17 +97,22 @@ class TestClaudeCodeModels:
         # Create hook-specific output
         hook_specific_output = PreToolUseHookSpecificOutput(
             permissionDecision=PermissionDecision.DENY,
-            permissionDecisionReason="File access denied"
+            permissionDecisionReason="File access denied",
         )
 
         output = PreToolUseOutput(
             hookSpecificOutput=hook_specific_output,
             decision="block",
-            reason="File access denied"
+            reason="File access denied",
         )
 
-        assert output.hook_specific_output.permission_decision == PermissionDecision.DENY
-        assert output.hook_specific_output.permission_decision_reason == "File access denied"
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.DENY
+        )
+        assert (
+            output.hook_specific_output.permission_decision_reason
+            == "File access denied"
+        )
         assert output.decision == "block"
         assert output.reason == "File access denied"
 

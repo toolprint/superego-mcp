@@ -20,6 +20,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from . import __version__
 from .cli_eval import CLIEvaluator
@@ -27,7 +28,9 @@ from .infrastructure.logging_config import configure_stderr_logging
 from .main import async_main as mcp_async_main
 
 
-async def mcp_async_main_with_config(config_path: Path, transport: str | None = None, port: int | None = None) -> None:
+async def mcp_async_main_with_config(
+    config_path: Path, transport: str | None = None, port: int | None = None
+) -> None:
     """Run MCP server with custom config path and optional CLI overrides.
 
     This is a wrapper around the main async_main that sets up
@@ -43,7 +46,8 @@ async def mcp_async_main_with_config(config_path: Path, transport: str | None = 
     # For now, we'll monkey-patch the config loading in main.py
     # This is a temporary solution until we refactor main.py
     import os
-    os.environ['SUPEREGO_CONFIG_PATH'] = str(config_path)
+
+    os.environ["SUPEREGO_CONFIG_PATH"] = str(config_path)
 
     # Run the main server with CLI overrides
     await mcp_async_main(transport=transport, port=port)
@@ -175,7 +179,8 @@ Output Format:
     )
 
     advise_parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         type=Path,
         help="Path to configuration file (default: ~/.toolprint/superego/config.yaml)",
         metavar="PATH",
@@ -208,7 +213,8 @@ Signal handling: Ctrl-C (SIGINT) and SIGTERM will cleanly shut down the server.
     )
 
     mcp_parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         type=Path,
         help="Path to configuration file (default: ~/.toolprint/superego/config.yaml)",
         metavar="PATH",
@@ -222,7 +228,8 @@ Signal handling: Ctrl-C (SIGINT) and SIGTERM will cleanly shut down the server.
     )
 
     mcp_parser.add_argument(
-        "-t", "--transport",
+        "-t",
+        "--transport",
         type=str,
         choices=["stdio", "http"],
         default="stdio",
@@ -231,7 +238,8 @@ Signal handling: Ctrl-C (SIGINT) and SIGTERM will cleanly shut down the server.
     )
 
     mcp_parser.add_argument(
-        "-p", "--port",
+        "-p",
+        "--port",
         type=int,
         default=8000,
         help="Port for HTTP transport mode (default: 8000)",
@@ -306,7 +314,8 @@ Claude Code Integration:
     )
 
     add_parser.add_argument(
-        "-m", "--matcher",
+        "-m",
+        "--matcher",
         type=str,
         help="Tool pattern to match (default: '*' for all tools)",
         metavar="PATTERN",
@@ -384,7 +393,8 @@ Claude Code Integration:
     )
 
     remove_group.add_argument(
-        "-m", "--matcher",
+        "-m",
+        "--matcher",
         type=str,
         help="Remove all hooks with this matcher pattern",
         metavar="PATTERN",
@@ -419,7 +429,7 @@ async def validate_claude_cli() -> bool:
             name="claude_cli_validator",
             type="claude",
             command="claude",
-            timeout_seconds=5
+            timeout_seconds=5,
         )
 
         # Try to create a Claude provider - this will validate CLI availability
@@ -436,8 +446,13 @@ async def validate_claude_cli() -> bool:
 
     except Exception as e:
         print(f"Claude CLI validation failed: {e}", file=sys.stderr)
-        print("Please ensure Claude Code is installed and authenticated:", file=sys.stderr)
-        print("  1. Install Claude Code: https://docs.anthropic.com/en/docs/claude-code", file=sys.stderr)
+        print(
+            "Please ensure Claude Code is installed and authenticated:", file=sys.stderr
+        )
+        print(
+            "  1. Install Claude Code: https://docs.anthropic.com/en/docs/claude-code",
+            file=sys.stderr,
+        )
         print("  2. Authenticate: claude auth", file=sys.stderr)
         return False
 
@@ -452,17 +467,24 @@ async def cmd_advise(args: argparse.Namespace) -> int:
         config_path = args.config or ensure_default_config_dir()
 
         if args.config and not config_path.exists():
-            print(f"Error: Specified config file does not exist: {config_path}", file=sys.stderr)
+            print(
+                f"Error: Specified config file does not exist: {config_path}",
+                file=sys.stderr,
+            )
             return 1
 
         # Load configuration if it exists
         if config_path.exists():
             try:
                 from .infrastructure.config import ConfigManager
+
                 config_manager = ConfigManager(str(config_path))
                 config_manager.load_config()
             except Exception as e:
-                print(f"Warning: Failed to load config from {config_path}: {e}", file=sys.stderr)
+                print(
+                    f"Warning: Failed to load config from {config_path}: {e}",
+                    file=sys.stderr,
+                )
                 print("Continuing with default configuration...", file=sys.stderr)
 
         # Use the existing CLI evaluator (could be enhanced with config in the future)
@@ -493,26 +515,36 @@ async def cmd_mcp(args: argparse.Namespace) -> int:
         config_path = args.config or ensure_default_config_dir()
 
         if args.config and not config_path.exists():
-            print(f"Error: Specified config file does not exist: {config_path}", file=sys.stderr)
+            print(
+                f"Error: Specified config file does not exist: {config_path}",
+                file=sys.stderr,
+            )
             return 1
 
         # Validate Claude CLI if requested
         if args.validate_claude:
             print("Validating Claude CLI availability...")
             if not await validate_claude_cli():
-                print("Claude CLI validation failed. Server startup aborted.", file=sys.stderr)
+                print(
+                    "Claude CLI validation failed. Server startup aborted.",
+                    file=sys.stderr,
+                )
                 return 1
             print("Claude CLI validation successful.")
 
         # Update main.py to use custom config path if provided
         if args.config:
             print(f"Using configuration from: {config_path}")
-            await mcp_async_main_with_config(config_path, transport=args.transport, port=args.port)
+            await mcp_async_main_with_config(
+                config_path, transport=args.transport, port=args.port
+            )
         else:
             # Check if default config path exists
             if config_path.exists():
                 print(f"Using default configuration from: {config_path}")
-                await mcp_async_main_with_config(config_path, transport=args.transport, port=args.port)
+                await mcp_async_main_with_config(
+                    config_path, transport=args.transport, port=args.port
+                )
             else:
                 print("Using default configuration (no config file found)")
                 await mcp_async_main(transport=args.transport, port=args.port)
@@ -540,8 +572,14 @@ async def cmd_hooks(args: argparse.Namespace) -> int:
 
         # Validate Claude Code installation
         if not hooks_manager.validate_claude_installation():
-            print("Warning: Claude Code installation not detected at ~/.claude/", file=sys.stderr)
-            print("Hooks will be created but may not be active until Claude Code is installed.", file=sys.stderr)
+            print(
+                "Warning: Claude Code installation not detected at ~/.claude/",
+                file=sys.stderr,
+            )
+            print(
+                "Hooks will be created but may not be active until Claude Code is installed.",
+                file=sys.stderr,
+            )
 
         # Route to appropriate hooks command
         if args.hooks_command == "add":
@@ -551,7 +589,10 @@ async def cmd_hooks(args: argparse.Namespace) -> int:
         elif args.hooks_command == "remove":
             return await cmd_hooks_remove(args, hooks_manager)
         else:
-            print("Error: No hooks command specified. Use 'superego hooks --help' for usage.", file=sys.stderr)
+            print(
+                "Error: No hooks command specified. Use 'superego hooks --help' for usage.",
+                file=sys.stderr,
+            )
             return 1
 
     except Exception as e:
@@ -559,7 +600,7 @@ async def cmd_hooks(args: argparse.Namespace) -> int:
         return 1
 
 
-async def cmd_hooks_add(args: argparse.Namespace, hooks_manager) -> int:
+async def cmd_hooks_add(args: argparse.Namespace, hooks_manager: Any) -> int:
     """Handle the hooks add subcommand."""
     try:
         # Get matcher - use default if not specified
@@ -568,16 +609,18 @@ async def cmd_hooks_add(args: argparse.Namespace, hooks_manager) -> int:
         # Provide helpful suggestions for common matchers
         if matcher == "*":
             print("Adding hook for all tools (matcher: '*')")
-            print("Tip: For better security, consider using --matcher 'Bash|Write|Edit|MultiEdit'")
+            print(
+                "Tip: For better security, consider using --matcher 'Bash|Write|Edit|MultiEdit'"
+            )
 
         # Add the hook
         hook = hooks_manager.add_hook(
             matcher=matcher,
             event_type=args.event_type,
             timeout=args.timeout,
-            url=getattr(args, 'url', None),
-            token=getattr(args, 'token', None),
-            fallback=getattr(args, 'fallback', False)
+            url=getattr(args, "url", None),
+            token=getattr(args, "token", None),
+            fallback=getattr(args, "fallback", False),
         )
 
         print("✓ Successfully added Superego hook")
@@ -608,7 +651,7 @@ async def cmd_hooks_add(args: argparse.Namespace, hooks_manager) -> int:
         return 1
 
 
-async def cmd_hooks_list(args: argparse.Namespace, hooks_manager) -> int:
+async def cmd_hooks_list(args: argparse.Namespace, hooks_manager: Any) -> int:
     """Handle the hooks list subcommand."""
     try:
         hooks = hooks_manager.list_hooks(event_type=args.event_type)
@@ -624,6 +667,7 @@ async def cmd_hooks_list(args: argparse.Namespace, hooks_manager) -> int:
         if args.json:
             # Output as JSON
             import json
+
             hook_data = [
                 {
                     "id": hook.id,
@@ -632,7 +676,7 @@ async def cmd_hooks_list(args: argparse.Namespace, hooks_manager) -> int:
                     "command": hook.command,
                     "timeout": hook.timeout,
                     "enabled": hook.enabled,
-                    "created_at": hook.created_at.isoformat()
+                    "created_at": hook.created_at.isoformat(),
                 }
                 for hook in hooks
             ]
@@ -650,7 +694,9 @@ async def cmd_hooks_list(args: argparse.Namespace, hooks_manager) -> int:
                 print(f"   Command: {hook.command}")
                 print(f"   Timeout: {hook.timeout}ms")
                 print(f"   Status: {status}")
-                print(f"   Created: {hook.created_at.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                print(
+                    f"   Created: {hook.created_at.strftime('%Y-%m-%d %H:%M:%S')} UTC"
+                )
                 if i < len(hooks):
                     print()
 
@@ -661,7 +707,7 @@ async def cmd_hooks_list(args: argparse.Namespace, hooks_manager) -> int:
         return 1
 
 
-async def cmd_hooks_remove(args: argparse.Namespace, hooks_manager) -> int:
+async def cmd_hooks_remove(args: argparse.Namespace, hooks_manager: Any) -> int:
     """Handle the hooks remove subcommand."""
     try:
         from .cli_hooks import HookNotFoundError
@@ -673,7 +719,7 @@ async def cmd_hooks_remove(args: argparse.Namespace, hooks_manager) -> int:
             print(f"Removing all hooks with matcher: {args.matcher}")
 
         response = input("Are you sure? (y/N): ").strip().lower()
-        if response not in ['y', 'yes']:
+        if response not in ["y", "yes"]:
             print("Removal cancelled.")
             return 0
 
@@ -720,4 +766,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

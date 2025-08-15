@@ -5,6 +5,7 @@ import logging
 import signal
 import sys
 from pathlib import Path
+from typing import Any
 
 from .domain.security_policy import SecurityPolicyEngine
 from .infrastructure.ai_service import AIServiceManager
@@ -12,7 +13,8 @@ from .infrastructure.circuit_breaker import CircuitBreaker
 from .infrastructure.config import ConfigManager
 from .infrastructure.config_watcher import ConfigWatcher
 from .infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
-from .infrastructure.inference import InferenceConfig, InferenceStrategyManager
+from .infrastructure.inference import InferenceConfig as InferenceStrategyConfig
+from .infrastructure.inference import InferenceStrategyManager
 from .infrastructure.prompt_builder import SecurePromptBuilder
 
 
@@ -32,15 +34,17 @@ def main() -> None:
         sys.exit(1)
 
 
-async def async_main(transport: str = None, port: int = None) -> None:
+async def async_main(transport: str | None = None, port: int | None = None) -> None:
     """Async main function with lifecycle management"""
     # Configure logging based on transport type
     if transport == "stdio":
         from .infrastructure.logging_config import configure_stderr_logging
+
         configure_stderr_logging(level="INFO", json_logs=False)
     else:
         # For http or default, use standard logging
         from .infrastructure.logging_config import configure_logging
+
         configure_logging(level="INFO", json_logs=False)
 
     # Load configuration
@@ -93,8 +97,37 @@ async def async_main(transport: str = None, port: int = None) -> None:
             "prompt_builder": prompt_builder,
         }
 
+        # Convert config format - need to convert between different CLIProviderConfig types
+        from .infrastructure.inference import (
+            CLIProviderConfig as InferenceCLIProviderConfig,
+        )
+
+        converted_cli_providers = []
+        for cli_provider in config.inference.cli_providers:
+            converted_cli_providers.append(
+                InferenceCLIProviderConfig(
+                    name=cli_provider.name,
+                    enabled=cli_provider.enabled,
+                    type=cli_provider.type,
+                    command=cli_provider.command,
+                    model=cli_provider.model,
+                    system_prompt=cli_provider.system_prompt,
+                    api_key_env_var=cli_provider.api_key_env_var,
+                    max_retries=getattr(cli_provider, "max_retries", 2),
+                    retry_delay_ms=getattr(cli_provider, "retry_delay_ms", 1000),
+                    timeout_seconds=getattr(cli_provider, "timeout_seconds", 30),
+                )
+            )
+
+        strategy_config = InferenceStrategyConfig(
+            timeout_seconds=config.inference.timeout_seconds,
+            provider_preference=config.inference.provider_preference,
+            cli_providers=converted_cli_providers,
+            api_providers=config.inference.api_providers,
+        )
+
         inference_manager = InferenceStrategyManager(
-            config=config.inference, dependencies=dependencies
+            config=strategy_config, dependencies=dependencies
         )
 
         print(
@@ -102,7 +135,7 @@ async def async_main(transport: str = None, port: int = None) -> None:
         )
     elif ai_service_manager and prompt_builder:
         # Fallback: create minimal inference config for backward compatibility
-        fallback_config = InferenceConfig()
+        fallback_config = InferenceStrategyConfig()
         dependencies = {
             "ai_service_manager": ai_service_manager,
             "prompt_builder": prompt_builder,
@@ -154,7 +187,7 @@ async def async_main(transport: str = None, port: int = None) -> None:
     shutdown_event = asyncio.Event()
     shutdown_count = 0
 
-    def signal_handler(signum: int, frame) -> None:
+    def signal_handler(signum: int, frame: Any) -> None:
         nonlocal shutdown_count
         shutdown_count += 1
 
@@ -164,10 +197,12 @@ async def async_main(transport: str = None, port: int = None) -> None:
         elif shutdown_count == 2:
             print("\nSecond shutdown signal received, forcing exit...")
             import os
+
             os._exit(1)
         else:
             print("\nMultiple shutdown signals received, forcing immediate exit...")
             import os
+
             os._exit(2)
 
     # Register signal handlers for graceful shutdown

@@ -14,7 +14,7 @@ from typing import Any
 
 # Add the project source directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent / "demo"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "demo"))
 
 from base_demo import BaseDemo
 
@@ -29,15 +29,16 @@ class InteractiveTestDemo(BaseDemo):
 
 class Colors:
     """ANSI color codes for terminal output."""
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
-    WHITE = '\033[97m'
-    BOLD = '\033[1m'
-    RESET = '\033[0m'
+
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    WHITE = "\033[97m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
 
 
 class InferenceProviderTester:
@@ -56,38 +57,48 @@ class InferenceProviderTester:
                 "name": "Write Simple File",
                 "tool_name": "Write",
                 "parameters": {"file_path": "test.py", "content": "print('hello')"},
-                "description": "Write a simple Python file"
+                "description": "Write a simple Python file",
             },
             "bash_ls": {
                 "name": "List Directory",
                 "tool_name": "Bash",
                 "parameters": {"command": "ls -la"},
-                "description": "List directory contents"
+                "description": "List directory contents",
             },
             "edit_config": {
                 "name": "Edit Config File",
                 "tool_name": "Edit",
-                "parameters": {"file_path": "config.yaml", "old_string": "old", "new_string": "new"},
-                "description": "Edit configuration file"
+                "parameters": {
+                    "file_path": "config.yaml",
+                    "old_string": "old",
+                    "new_string": "new",
+                },
+                "description": "Edit configuration file",
             },
             "write_complex": {
                 "name": "Write Complex File",
                 "tool_name": "Write",
-                "parameters": {"file_path": "./src/new_module.py", "content": "# New module\n\ndef main():\n    pass\n"},
-                "description": "Creating a new file in project directory"
+                "parameters": {
+                    "file_path": "./src/new_module.py",
+                    "content": "# New module\n\ndef main():\n    pass\n",
+                },
+                "description": "Creating a new file in project directory",
             },
             "bash_dangerous": {
                 "name": "Dangerous Command",
                 "tool_name": "Bash",
-                "parameters": {"command": "rm -rf /tmp/test", "description": "Delete test files"},
-                "description": "Running potentially dangerous command"
+                "parameters": {
+                    "command": "rm -rf /tmp/test",
+                    "description": "Delete test files",
+                },
+                "description": "Running potentially dangerous command",
             },
             "read_sensitive": {
                 "name": "Read Sensitive File",
                 "tool_name": "Read",
                 "parameters": {"file_path": "/etc/passwd"},
-                "description": "Attempting to read system files"
-            }
+                "description": "Attempting to read system files",
+            },
         }
 
     def get_demo_instance(self, provider: str) -> BaseDemo:
@@ -100,26 +111,32 @@ class InferenceProviderTester:
                     log_level="INFO",
                     ai_provider=provider,
                     claude_model=self.current_model,
-                    session_id=f"interactive-{int(time.time())}"
+                    session_id=f"interactive-{int(time.time())}",
                 )
                 print(f"{Colors.GREEN}✓ {provider} instance created{Colors.RESET}")
             except Exception as e:
-                print(f"{Colors.RED}✗ Failed to create {provider} instance: {e}{Colors.RESET}")
+                print(
+                    f"{Colors.RED}✗ Failed to create {provider} instance: {e}{Colors.RESET}"
+                )
                 return None
 
         return self.demo_instances[provider]
 
     def print_header(self, title: str):
         """Print a formatted header."""
-        print(f"\n{Colors.CYAN}{Colors.BOLD}{'='*60}{Colors.RESET}")
+        print(f"\n{Colors.CYAN}{Colors.BOLD}{'=' * 60}{Colors.RESET}")
         print(f"{Colors.CYAN}{Colors.BOLD}{title:^60}{Colors.RESET}")
-        print(f"{Colors.CYAN}{Colors.BOLD}{'='*60}{Colors.RESET}")
+        print(f"{Colors.CYAN}{Colors.BOLD}{'=' * 60}{Colors.RESET}")
 
     def print_menu(self):
         """Print the main menu."""
         self.print_header("Inference Provider Tester")
-        print(f"\n{Colors.BOLD}Current Provider:{Colors.RESET} {Colors.GREEN}{self.current_provider}{Colors.RESET}")
-        print(f"{Colors.BOLD}Current Model:{Colors.RESET} {Colors.GREEN}{self.current_model}{Colors.RESET}")
+        print(
+            f"\n{Colors.BOLD}Current Provider:{Colors.RESET} {Colors.GREEN}{self.current_provider}{Colors.RESET}"
+        )
+        print(
+            f"{Colors.BOLD}Current Model:{Colors.RESET} {Colors.GREEN}{self.current_model}{Colors.RESET}"
+        )
         print(f"\n{Colors.BOLD}Options:{Colors.RESET}")
         print("1. Select Provider")
         print("2. Test Single Request")
@@ -142,10 +159,19 @@ class InferenceProviderTester:
             print(f"{i}. {status} {provider}{current}")
 
         try:
-            choice = int(input(f"\n{Colors.YELLOW}Select provider (1-{len(providers)}): {Colors.RESET}")) - 1
+            choice = (
+                int(
+                    input(
+                        f"\n{Colors.YELLOW}Select provider (1-{len(providers)}): {Colors.RESET}"
+                    )
+                )
+                - 1
+            )
             if 0 <= choice < len(providers):
                 self.current_provider = providers[choice]
-                print(f"{Colors.GREEN}✓ Selected provider: {self.current_provider}{Colors.RESET}")
+                print(
+                    f"{Colors.GREEN}✓ Selected provider: {self.current_provider}{Colors.RESET}"
+                )
             else:
                 print(f"{Colors.RED}Invalid selection{Colors.RESET}")
         except (ValueError, KeyboardInterrupt):
@@ -172,7 +198,9 @@ class InferenceProviderTester:
             else:
                 parameters = {}
 
-            description = input("Description (optional): ").strip() or f"{tool_name} operation"
+            description = (
+                input("Description (optional): ").strip() or f"{tool_name} operation"
+            )
 
             self._execute_test(tool_name, parameters, description)
 
@@ -201,7 +229,9 @@ class InferenceProviderTester:
             else:
                 parameters = {}
 
-            description = input("Description (optional): ").strip() or f"{tool_name} operation"
+            description = (
+                input("Description (optional): ").strip() or f"{tool_name} operation"
+            )
 
             # Test with each provider
             providers = ["mock", "claude_cli"]
@@ -212,7 +242,9 @@ class InferenceProviderTester:
                 original_provider = self.current_provider
                 self.current_provider = provider
 
-                result = self._execute_test(tool_name, parameters, description, show_result=False)
+                result = self._execute_test(
+                    tool_name, parameters, description, show_result=False
+                )
                 results[provider] = result
 
                 self.current_provider = original_provider
@@ -232,11 +264,20 @@ class InferenceProviderTester:
             print(f"{i}. {case['name']} - {case['description']}")
 
         try:
-            choice = int(input(f"\n{Colors.YELLOW}Select test case (1-{len(cases)}): {Colors.RESET}")) - 1
+            choice = (
+                int(
+                    input(
+                        f"\n{Colors.YELLOW}Select test case (1-{len(cases)}): {Colors.RESET}"
+                    )
+                )
+                - 1
+            )
             if 0 <= choice < len(cases):
                 key, case = cases[choice]
                 print(f"\n{Colors.GREEN}Running: {case['name']}{Colors.RESET}")
-                self._execute_test(case['tool_name'], case['parameters'], case['description'])
+                self._execute_test(
+                    case["tool_name"], case["parameters"], case["description"]
+                )
             else:
                 print(f"{Colors.RED}Invalid selection{Colors.RESET}")
         except (ValueError, KeyboardInterrupt):
@@ -253,12 +294,12 @@ class InferenceProviderTester:
         print(f"Model: {demo.claude_model}")
         print(f"Session ID: {demo.session_id}")
 
-        if hasattr(demo, 'provider_info') and demo.provider_info:
+        if hasattr(demo, "provider_info") and demo.provider_info:
             print(f"Provider Info: {json.dumps(demo.provider_info, indent=2)}")
 
         # Show health status if available
         try:
-            if hasattr(demo.security_engine, 'health_check'):
+            if hasattr(demo.security_engine, "health_check"):
                 health = demo.security_engine.health_check()
                 print(f"\n{Colors.BOLD}Health Status:{Colors.RESET}")
                 print(json.dumps(health, indent=2, default=str))
@@ -268,7 +309,9 @@ class InferenceProviderTester:
     def debug_cli_command(self):
         """Debug CLI command execution manually."""
         if self.current_provider != "claude_cli":
-            print(f"{Colors.RED}CLI debugging only available for claude_cli provider{Colors.RESET}")
+            print(
+                f"{Colors.RED}CLI debugging only available for claude_cli provider{Colors.RESET}"
+            )
             return
 
         print(f"\n{Colors.BOLD}CLI Command Debugger{Colors.RESET}")
@@ -288,11 +331,7 @@ class InferenceProviderTester:
         try:
             start_time = time.time()
             result = subprocess.run(
-                cmd,
-                input=prompt,
-                text=True,
-                capture_output=True,
-                timeout=30
+                cmd, input=prompt, text=True, capture_output=True, timeout=30
             )
             end_time = time.time()
 
@@ -304,7 +343,9 @@ class InferenceProviderTester:
 
             if result.stdout:
                 print(f"\n{Colors.GREEN}Stdout:{Colors.RESET}")
-                print(result.stdout[:1000] + ("..." if len(result.stdout) > 1000 else ""))
+                print(
+                    result.stdout[:1000] + ("..." if len(result.stdout) > 1000 else "")
+                )
 
             if result.stderr:
                 print(f"\n{Colors.RED}Stderr:{Colors.RESET}")
@@ -323,11 +364,15 @@ class InferenceProviderTester:
 
         print(f"\n{Colors.BOLD}Test Results History:{Colors.RESET}")
         for i, result in enumerate(self.test_results, 1):
-            status_color = Colors.GREEN if result['success'] else Colors.RED
-            print(f"{i}. [{result['provider']}] {result['tool_name']} - {status_color}{result['status']}{Colors.RESET}")
-            if 'decision' in result:
-                print(f"   Decision: {result['decision']['action']} (confidence: {result['decision']['confidence']:.1%})")
-            if 'duration' in result:
+            status_color = Colors.GREEN if result["success"] else Colors.RED
+            print(
+                f"{i}. [{result['provider']}] {result['tool_name']} - {status_color}{result['status']}{Colors.RESET}"
+            )
+            if "decision" in result:
+                print(
+                    f"   Decision: {result['decision']['action']} (confidence: {result['decision']['confidence']:.1%})"
+                )
+            if "duration" in result:
                 print(f"   Duration: {result['duration']:.2f}s")
             print()
 
@@ -336,14 +381,22 @@ class InferenceProviderTester:
         self.test_results = []
         print(f"{Colors.GREEN}✓ Test results cleared{Colors.RESET}")
 
-    def _execute_test(self, tool_name: str, parameters: dict[str, Any], description: str, show_result: bool = True) -> dict[str, Any]:
+    def _execute_test(
+        self,
+        tool_name: str,
+        parameters: dict[str, Any],
+        description: str,
+        show_result: bool = True,
+    ) -> dict[str, Any]:
         """Execute a test and return results."""
         demo = self.get_demo_instance(self.current_provider)
         if not demo:
             return {"success": False, "error": "Failed to create demo instance"}
 
         if show_result:
-            print(f"\n{Colors.BLUE}Executing with {self.current_provider}...{Colors.RESET}")
+            print(
+                f"\n{Colors.BLUE}Executing with {self.current_provider}...{Colors.RESET}"
+            )
 
         start_time = time.time()
         try:
@@ -359,7 +412,7 @@ class InferenceProviderTester:
                 "success": success,
                 "status": "success" if success else "error",
                 "duration": end_time - start_time,
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
 
             if success:
@@ -385,7 +438,7 @@ class InferenceProviderTester:
                 "status": "exception",
                 "error": str(e),
                 "duration": end_time - start_time,
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
 
             self.test_results.append(test_result)
@@ -395,13 +448,21 @@ class InferenceProviderTester:
 
             return test_result
 
-    def _display_single_result(self, test_result: dict[str, Any], raw_result: dict[str, Any]):
+    def _display_single_result(
+        self, test_result: dict[str, Any], raw_result: dict[str, Any]
+    ):
         """Display results from a single test."""
         if test_result["success"]:
             decision = test_result["decision"]
             action = decision["action"]
 
-            action_color = Colors.GREEN if action == "allow" else Colors.RED if action == "deny" else Colors.YELLOW
+            action_color = (
+                Colors.GREEN
+                if action == "allow"
+                else Colors.RED
+                if action == "deny"
+                else Colors.YELLOW
+            )
             print(f"\n{action_color}Decision: {action}{Colors.RESET}")
             print(f"Reason: {decision['reason']}")
             print(f"Confidence: {decision['confidence']:.1%}")
@@ -416,7 +477,13 @@ class InferenceProviderTester:
             print(f"{Colors.RED}Error: {test_result['error']}{Colors.RESET}")
             print(f"Duration: {test_result['duration']:.2f}s")
 
-    def _display_comparison(self, results: dict[str, dict[str, Any]], tool_name: str, parameters: dict[str, Any], description: str):
+    def _display_comparison(
+        self,
+        results: dict[str, dict[str, Any]],
+        tool_name: str,
+        parameters: dict[str, Any],
+        description: str,
+    ):
         """Display comparison results."""
         print(f"\n{Colors.BOLD}Comparison Results:{Colors.RESET}")
         print(f"Tool: {tool_name}")
@@ -429,13 +496,21 @@ class InferenceProviderTester:
             if result["success"]:
                 decision = result["decision"]
                 action = decision["action"]
-                action_color = Colors.GREEN if action == "allow" else Colors.RED if action == "deny" else Colors.YELLOW
+                action_color = (
+                    Colors.GREEN
+                    if action == "allow"
+                    else Colors.RED
+                    if action == "deny"
+                    else Colors.YELLOW
+                )
 
                 print(f"  Status: {Colors.GREEN}SUCCESS{Colors.RESET}")
                 print(f"  Decision: {action_color}{action}{Colors.RESET}")
                 print(f"  Confidence: {decision['confidence']:.1%}")
                 print(f"  Duration: {result['duration']:.2f}s")
-                print(f"  Reason: {decision['reason'][:100]}{'...' if len(decision['reason']) > 100 else ''}")
+                print(
+                    f"  Reason: {decision['reason'][:100]}{'...' if len(decision['reason']) > 100 else ''}"
+                )
             else:
                 print(f"  Status: {Colors.RED}FAILED{Colors.RESET}")
                 print(f"  Error: {result['error']}")
@@ -449,7 +524,9 @@ class InferenceProviderTester:
         while True:
             try:
                 self.print_menu()
-                choice = input(f"\n{Colors.YELLOW}Select option (1-9): {Colors.RESET}").strip()
+                choice = input(
+                    f"\n{Colors.YELLOW}Select option (1-9): {Colors.RESET}"
+                ).strip()
 
                 if choice == "1":
                     self.select_provider()
@@ -468,7 +545,9 @@ class InferenceProviderTester:
                 elif choice == "8":
                     self.clear_test_results()
                 elif choice == "9":
-                    print(f"\n{Colors.GREEN}Thanks for using the Inference Provider Tester!{Colors.RESET}")
+                    print(
+                        f"\n{Colors.GREEN}Thanks for using the Inference Provider Tester!{Colors.RESET}"
+                    )
                     break
                 else:
                     print(f"{Colors.RED}Invalid option{Colors.RESET}")
@@ -477,11 +556,14 @@ class InferenceProviderTester:
                 input(f"\n{Colors.CYAN}Press Enter to continue...{Colors.RESET}")
 
             except KeyboardInterrupt:
-                print(f"\n\n{Colors.GREEN}Thanks for using the Inference Provider Tester!{Colors.RESET}")
+                print(
+                    f"\n\n{Colors.GREEN}Thanks for using the Inference Provider Tester!{Colors.RESET}"
+                )
                 break
             except Exception as e:
                 print(f"\n{Colors.RED}Unexpected error: {e}{Colors.RESET}")
                 import traceback
+
                 traceback.print_exc()
 
 

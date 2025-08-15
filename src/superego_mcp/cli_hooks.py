@@ -20,21 +20,25 @@ from pydantic import BaseModel, Field
 
 class HooksError(Exception):
     """Base exception for hooks operations."""
+
     pass
 
 
 class SettingsNotFoundError(HooksError):
     """Claude settings file not found."""
+
     pass
 
 
 class HookNotFoundError(HooksError):
     """Specified hook not found."""
+
     pass
 
 
 class InvalidSettingsError(HooksError):
     """Settings file is invalid or corrupted."""
+
     pass
 
 
@@ -42,7 +46,9 @@ class SuperegoHook(BaseModel):
     """Represents a superego-managed Claude Code hook."""
 
     id: str = Field(..., description="Unique identifier for the hook")
-    matcher: str = Field(..., description="Tool pattern matcher (e.g., '*', 'Bash|Write')")
+    matcher: str = Field(
+        ..., description="Tool pattern matcher (e.g., '*', 'Bash|Write')"
+    )
     event_type: str = Field(default="PreToolUse", description="Hook event type")
     command: str = Field(default="superego advise", description="Command to execute")
     timeout: int = Field(default=5000, description="Timeout in milliseconds")
@@ -52,8 +58,12 @@ class SuperegoHook(BaseModel):
     # New fields for centralized mode
     url: str | None = Field(default=None, description="Centralized server URL")
     token: str | None = Field(default=None, description="Authentication token")
-    mode: str = Field(default="local", description="Hook mode: 'local' or 'centralized'")
-    fallback_enabled: bool = Field(default=False, description="Enable fallback to local on HTTP failure")
+    mode: str = Field(
+        default="local", description="Hook mode: 'local' or 'centralized'"
+    )
+    fallback_enabled: bool = Field(
+        default=False, description="Enable fallback to local on HTTP failure"
+    )
 
     def to_claude_hook(self) -> dict[str, Any]:
         """Convert to Claude Code hook format."""
@@ -68,7 +78,7 @@ class SuperegoHook(BaseModel):
             "_superego_matcher": self.matcher,
             "_superego_event_type": self.event_type,
             "_superego_mode": self.mode,
-            "_superego_fallback": self.fallback_enabled
+            "_superego_fallback": self.fallback_enabled,
         }
 
         # Add centralized mode specific fields
@@ -80,7 +90,9 @@ class SuperegoHook(BaseModel):
         return hook_data
 
     @classmethod
-    def from_claude_hook(cls, hook_data: dict[str, Any], matcher: str, event_type: str = "PreToolUse") -> "SuperegoHook":
+    def from_claude_hook(
+        cls, hook_data: dict[str, Any], matcher: str, event_type: str = "PreToolUse"
+    ) -> "SuperegoHook":
         """Create SuperegoHook from Claude Code hook data."""
         return cls(
             id=hook_data.get("_superego_id", str(uuid.uuid4())),
@@ -89,11 +101,13 @@ class SuperegoHook(BaseModel):
             command=hook_data.get("command", "superego advise"),
             timeout=hook_data.get("timeout", 5000),
             enabled=hook_data.get("_superego_enabled", True),
-            created_at=datetime.fromisoformat(hook_data.get("_superego_created", datetime.now(UTC).isoformat())),
+            created_at=datetime.fromisoformat(
+                hook_data.get("_superego_created", datetime.now(UTC).isoformat())
+            ),
             url=hook_data.get("_superego_url"),
             token=hook_data.get("_superego_token"),
             mode=hook_data.get("_superego_mode", "local"),
-            fallback_enabled=hook_data.get("_superego_fallback", False)
+            fallback_enabled=hook_data.get("_superego_fallback", False),
         )
 
 
@@ -106,7 +120,9 @@ class ClaudeSettingsManager:
         Args:
             settings_path: Optional custom path to settings file
         """
-        self.settings_path = settings_path or (Path.home() / ".claude" / "settings.json")
+        self.settings_path = settings_path or (
+            Path.home() / ".claude" / "settings.json"
+        )
         self.logger = structlog.get_logger("claude_settings")
 
     def read_settings(self) -> dict[str, Any]:
@@ -124,8 +140,8 @@ class ClaudeSettingsManager:
             return {"hooks": {}}
 
         try:
-            with open(self.settings_path, encoding='utf-8') as f:
-                settings = json.load(f)
+            with open(self.settings_path, encoding="utf-8") as f:
+                settings: dict[str, Any] = json.load(f)
 
             # Ensure hooks section exists
             if "hooks" not in settings:
@@ -134,11 +150,13 @@ class ClaudeSettingsManager:
             return settings
 
         except json.JSONDecodeError as e:
-            raise InvalidSettingsError(f"Invalid JSON in settings file: {e}")
+            raise InvalidSettingsError(f"Invalid JSON in settings file: {e}") from e
         except Exception as e:
-            raise InvalidSettingsError(f"Failed to read settings file: {e}")
+            raise InvalidSettingsError(f"Failed to read settings file: {e}") from e
 
-    def write_settings(self, settings: dict[str, Any], create_backup: bool = True) -> None:
+    def write_settings(
+        self, settings: dict[str, Any], create_backup: bool = True
+    ) -> None:
         """Write settings to file safely.
 
         Args:
@@ -162,11 +180,11 @@ class ClaudeSettingsManager:
         # Write to temporary file first
         temp_path = self.settings_path.with_suffix(".tmp")
         try:
-            with open(temp_path, 'w', encoding='utf-8') as f:
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(settings, f, indent=2, ensure_ascii=False)
 
             # Validate by reading back
-            with open(temp_path, encoding='utf-8') as f:
+            with open(temp_path, encoding="utf-8") as f:
                 json.load(f)
 
             # Move into place atomically
@@ -177,7 +195,7 @@ class ClaudeSettingsManager:
             # Clean up temp file if it exists
             if temp_path.exists():
                 temp_path.unlink()
-            raise InvalidSettingsError(f"Failed to write settings: {e}")
+            raise InvalidSettingsError(f"Failed to write settings: {e}") from e
 
 
 class HooksManager:
@@ -189,7 +207,7 @@ class HooksManager:
         "common": "Bash|Write|Edit|MultiEdit",
         "dangerous": "Bash|Write|Edit|MultiEdit",
         "filesystem": "Write|Edit|MultiEdit|Read",
-        "mcp": "mcp__.*"
+        "mcp": "mcp__.*",
     }
 
     def __init__(self, settings_path: Path | None = None):
@@ -201,10 +219,16 @@ class HooksManager:
         self.settings_manager = ClaudeSettingsManager(settings_path)
         self.logger = structlog.get_logger("hooks_manager")
 
-    def add_hook(self, matcher: str = "*", event_type: str = "PreToolUse",
-                 command: str | None = None, timeout: int = 5000,
-                 url: str | None = None, token: str | None = None,
-                 fallback: bool = False) -> SuperegoHook:
+    def add_hook(
+        self,
+        matcher: str = "*",
+        event_type: str = "PreToolUse",
+        command: str | None = None,
+        timeout: int = 5000,
+        url: str | None = None,
+        token: str | None = None,
+        fallback: bool = False,
+    ) -> SuperegoHook:
         """Add a new superego hook.
 
         Args:
@@ -229,7 +253,7 @@ class HooksManager:
             if command is None:
                 command = self._generate_curl_command(url, token, timeout, fallback)
             # Validate URL format
-            if not url.startswith(('http://', 'https://')):
+            if not url.startswith(("http://", "https://")):
                 raise ValueError("URL must start with http:// or https://")
         else:
             mode = "local"
@@ -246,7 +270,7 @@ class HooksManager:
             url=url,
             token=token,
             mode=mode,
-            fallback_enabled=fallback
+            fallback_enabled=fallback,
         )
 
         # Read current settings
@@ -265,10 +289,7 @@ class HooksManager:
 
         if matcher_group is None:
             # Create new matcher group
-            matcher_group = {
-                "matcher": matcher,
-                "hooks": []
-            }
+            matcher_group = {"matcher": matcher, "hooks": []}
             settings["hooks"][event_type].append(matcher_group)
 
         # Add hook to the group
@@ -278,13 +299,22 @@ class HooksManager:
         # Write settings
         self.settings_manager.write_settings(settings)
 
-        self.logger.info("Added superego hook",
-                        hook_id=hook.id, matcher=matcher, event_type=event_type)
+        self.logger.info(
+            "Added superego hook",
+            hook_id=hook.id,
+            matcher=matcher,
+            event_type=event_type,
+        )
 
         return hook
 
-    def _generate_curl_command(self, url: str, token: str | None = None,
-                             timeout: int = 5000, fallback: bool = False) -> str:
+    def _generate_curl_command(
+        self,
+        url: str,
+        token: str | None = None,
+        timeout: int = 5000,
+        fallback: bool = False,
+    ) -> str:
         """Generate curl command for centralized hook evaluation.
 
         Args:
@@ -302,11 +332,11 @@ class HooksManager:
         # Build curl command
         curl_parts = [
             "curl",
-            "--fail",           # Fail on HTTP errors
-            "--silent",         # Don't show progress meter
-            "--show-error",     # Show error messages
+            "--fail",  # Fail on HTTP errors
+            "--silent",  # Don't show progress meter
+            "--show-error",  # Show error messages
             f"--max-time {timeout_seconds}",  # Request timeout
-            "--retry 2",        # Retry failed requests
+            "--retry 2",  # Retry failed requests
             "--retry-delay 1",  # Wait between retries
         ]
 
@@ -315,10 +345,12 @@ class HooksManager:
             curl_parts.append(f"--header 'Authorization: Bearer {token}'")
 
         # Add JSON data from stdin and endpoint URL
-        curl_parts.extend([
-            "--json @-",        # Send stdin as JSON
-            f'"{url}/v1/hooks"' # Endpoint URL
-        ])
+        curl_parts.extend(
+            [
+                "--json @-",  # Send stdin as JSON
+                f'"{url}/v1/hooks"',  # Endpoint URL
+            ]
+        )
 
         curl_cmd = " ".join(curl_parts)
 
@@ -351,12 +383,16 @@ class HooksManager:
                 for hook_data in matcher_group.get("hooks", []):
                     # Only include superego-managed hooks
                     if hook_data.get("_superego_managed"):
-                        hook = SuperegoHook.from_claude_hook(hook_data, matcher, event_name)
+                        hook = SuperegoHook.from_claude_hook(
+                            hook_data, matcher, event_name
+                        )
                         hooks.append(hook)
 
         return hooks
 
-    def remove_hook(self, hook_id: str | None = None, matcher: str | None = None) -> int:
+    def remove_hook(
+        self, hook_id: str | None = None, matcher: str | None = None
+    ) -> int:
         """Remove superego hooks.
 
         Args:
@@ -397,9 +433,11 @@ class HooksManager:
                         remaining_hooks.append(hook_data)
                     else:
                         removed_count += 1
-                        self.logger.info("Removed superego hook",
-                                       hook_id=hook_data.get("_superego_id"),
-                                       matcher=matcher_group.get("matcher"))
+                        self.logger.info(
+                            "Removed superego hook",
+                            hook_id=hook_data.get("_superego_id"),
+                            matcher=matcher_group.get("matcher"),
+                        )
 
                 # Update hooks list
                 matcher_group["hooks"] = remaining_hooks
@@ -445,4 +483,3 @@ class HooksManager:
         """
         claude_dir = Path.home() / ".claude"
         return claude_dir.exists() and claude_dir.is_dir()
-

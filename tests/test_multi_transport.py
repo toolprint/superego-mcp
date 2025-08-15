@@ -280,7 +280,6 @@ class TestHTTPTransport:
         assert data["confidence"] == 0.9
 
 
-
 class TestSSETransport:
     """Test cases for SSE transport."""
 

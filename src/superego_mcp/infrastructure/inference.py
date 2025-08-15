@@ -195,11 +195,13 @@ class CLIProvider(InferenceProvider):
             "Executing CLI command",
             command=" ".join(cmd),
             prompt_length=len(prompt_text),
-            prompt_preview=prompt_text[:100] + "..." if len(prompt_text) > 100 else prompt_text,
+            prompt_preview=prompt_text[:100] + "..."
+            if len(prompt_text) > 100
+            else prompt_text,
         )
 
         retry_count = 0
-        last_error = None
+        last_error: Exception | None = None
 
         while retry_count <= self.config.max_retries:
             try:
@@ -213,15 +215,20 @@ class CLIProvider(InferenceProvider):
                 )
 
                 # Send prompt via stdin and wait for completion with timeout
-                actual_timeout = min(request.timeout_seconds, 30)  # Cap at 30 seconds for faster failure detection
+                actual_timeout = min(
+                    request.timeout_seconds, 30
+                )  # Cap at 30 seconds for faster failure detection
                 stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(input=prompt_text.encode('utf-8')), timeout=actual_timeout
+                    proc.communicate(input=prompt_text.encode("utf-8")),
+                    timeout=actual_timeout,
                 )
 
                 if proc.returncode != 0:
                     error_msg = stderr.decode("utf-8", errors="ignore")
                     if not error_msg.strip():
-                        error_msg = "CLI command failed with no error output (possible timeout)"
+                        error_msg = (
+                            "CLI command failed with no error output (possible timeout)"
+                        )
                     raise RuntimeError(f"CLI failed: {error_msg}")
 
                 # Parse JSON response
@@ -231,11 +238,15 @@ class CLIProvider(InferenceProvider):
                 self.logger.info(
                     "Raw CLI response",
                     response_length=len(response_text),
-                    response_preview=response_text[:500] if response_text else "(empty)",
+                    response_preview=response_text[:500]
+                    if response_text
+                    else "(empty)",
                 )
 
                 if not response_text.strip():
-                    raise RuntimeError("CLI returned empty response (possible timeout or execution failure)")
+                    raise RuntimeError(
+                        "CLI returned empty response (possible timeout or execution failure)"
+                    )
 
                 response = self._parse_json_response(response_text)
                 response_time_ms = int((time.perf_counter() - start_time) * 1000)
@@ -324,22 +335,18 @@ class CLIProvider(InferenceProvider):
             "type": "user",
             "message": {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": simple_prompt
-                    }
-                ]
-            }
+                "content": [{"type": "text", "text": simple_prompt}],
+            },
         }
 
         # Convert to JSONL format (single line JSON)
         import json
-        jsonl_input = json.dumps(json_message, separators=(',', ':'))
+
+        jsonl_input = json.dumps(json_message, separators=(",", ":"))
 
         return cmd, jsonl_input
 
-    def _sanitize_prompt(self, prompt: str) -> str:
+    def _sanitize_prompt(self, prompt: Any) -> str:
         """Sanitize prompt text to prevent command injection.
 
         Args:
@@ -425,7 +432,7 @@ class CLIProvider(InferenceProvider):
 
             # Streaming JSON format returns multiple JSON objects, one per line
             # We want the final "result" object
-            lines = response_text.split('\n')
+            lines = response_text.split("\n")
             result_obj = None
 
             for line in lines:
@@ -445,11 +452,15 @@ class CLIProvider(InferenceProvider):
                 except json.JSONDecodeError:
                     continue
 
-            if result_obj:
-                return result_obj
+            if result_obj and isinstance(result_obj, dict):
+                return result_obj  # type: ignore[no-any-return]
 
             # Fallback: try to parse as single JSON object
-            return json.loads(response_text)
+            fallback_result = json.loads(response_text)
+            if isinstance(fallback_result, dict):
+                return fallback_result
+            else:
+                raise ValueError("Response is not a JSON object")
 
         except json.JSONDecodeError as e:
             self.logger.error(
@@ -600,7 +611,11 @@ class CLIProvider(InferenceProvider):
 
             if result.returncode == 0:
                 # CLI is available - it could be using OAuth or API key
-                api_key = os.getenv(self.config.api_key_env_var) if self.config.api_key_env_var else None
+                api_key = (
+                    os.getenv(self.config.api_key_env_var)
+                    if self.config.api_key_env_var
+                    else None
+                )
                 auth_method = "API key" if api_key else "OAuth/CLI auth"
 
                 return HealthStatus(
@@ -789,36 +804,42 @@ class MockInferenceProvider(InferenceProvider):
         self.logger = structlog.get_logger(__name__)
 
         # Configurable dangerous patterns
-        self.dangerous_patterns = self.config.get("dangerous_patterns", [
-            "rm -rf",
-            "/etc/passwd",
-            "/etc/shadow",
-            "sudo rm",
-            "chmod 777",
-            "wget http://",
-            "curl http://",
-            "nc -l",
-            "netcat",
-            "> /dev/",
-            "dd if=",
-            "mkfs",
-            "fdisk",
-            "format",
-            "del /s",
-            "rmdir /s"
-        ])
+        self.dangerous_patterns = self.config.get(
+            "dangerous_patterns",
+            [
+                "rm -rf",
+                "/etc/passwd",
+                "/etc/shadow",
+                "sudo rm",
+                "chmod 777",
+                "wget http://",
+                "curl http://",
+                "nc -l",
+                "netcat",
+                "> /dev/",
+                "dd if=",
+                "mkfs",
+                "fdisk",
+                "format",
+                "del /s",
+                "rmdir /s",
+            ],
+        )
 
         # Configurable system paths to protect
-        self.protected_paths = self.config.get("protected_paths", [
-            "/etc/",
-            "/var/log/",
-            "/boot/",
-            "/sys/",
-            "/proc/",
-            "C:\\Windows\\",
-            "C:\\Program Files\\",
-            "C:\\System32\\"
-        ])
+        self.protected_paths = self.config.get(
+            "protected_paths",
+            [
+                "/etc/",
+                "/var/log/",
+                "/boot/",
+                "/sys/",
+                "/proc/",
+                "C:\\Windows\\",
+                "C:\\Program Files\\",
+                "C:\\System32\\",
+            ],
+        )
 
     async def evaluate(self, request: InferenceRequest) -> InferenceDecision:
         """Evaluate using simple pattern matching rules.
@@ -893,7 +914,7 @@ class MockInferenceProvider(InferenceProvider):
         text_parts = [
             request.prompt,
             request.tool_request.tool_name,
-            str(request.tool_request.parameters)
+            str(request.tool_request.parameters),
         ]
 
         return " ".join(str(part) for part in text_parts if part)
@@ -933,9 +954,11 @@ class MockInferenceProvider(InferenceProvider):
     async def initialize(self) -> None:
         """Initialize mock provider resources."""
         # Mock provider needs no initialization
-        self.logger.info("Mock inference provider initialized",
-                        patterns=len(self.dangerous_patterns),
-                        protected_paths=len(self.protected_paths))
+        self.logger.info(
+            "Mock inference provider initialized",
+            patterns=len(self.dangerous_patterns),
+            protected_paths=len(self.protected_paths),
+        )
 
     async def cleanup(self) -> None:
         """Cleanup mock provider resources."""

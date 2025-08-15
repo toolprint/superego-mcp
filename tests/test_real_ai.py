@@ -8,7 +8,7 @@ from pathlib import Path
 
 # Add the project source directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent / "demo"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "demo"))
 
 from base_demo import BaseDemo
 
@@ -18,27 +18,31 @@ class TestDemo(BaseDemo):
 
     def run(self):
         """Run a few test scenarios."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Testing AI Provider: {self.ai_provider}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Test scenarios that should trigger sampling
         scenarios = [
             {
                 "tool_name": "Write",
                 "parameters": {"file_path": "test.py", "content": "print('hello')"},
-                "description": "Write a simple Python file"
+                "description": "Write a simple Python file",
             },
             {
                 "tool_name": "Bash",
                 "parameters": {"command": "ls -la"},
-                "description": "List directory contents"
+                "description": "List directory contents",
             },
             {
                 "tool_name": "Edit",
-                "parameters": {"file_path": "config.yaml", "old_string": "old", "new_string": "new"},
-                "description": "Edit configuration file"
-            }
+                "parameters": {
+                    "file_path": "config.yaml",
+                    "old_string": "old",
+                    "new_string": "new",
+                },
+                "description": "Edit configuration file",
+            },
         ]
 
         print(f"Running {len(scenarios)} test scenarios...")
@@ -47,7 +51,7 @@ class TestDemo(BaseDemo):
             self.process_tool_request(
                 tool_name=scenario["tool_name"],
                 parameters=scenario["parameters"],
-                description=scenario["description"]
+                description=scenario["description"],
             )
 
         # Display results
@@ -68,7 +72,9 @@ def main():
 
         # Test Claude CLI availability
         try:
-            result = subprocess.run(["claude", "-p", "test"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                ["claude", "-p", "test"], capture_output=True, text=True, timeout=5
+            )
             if result.returncode == 0:
                 api_key = os.getenv(args.api_key_env) if args.api_key_env else None
                 auth_method = "API key" if api_key else "OAuth/CLI auth"
@@ -85,7 +91,7 @@ def main():
             rules_file=args.rules_file,
             ai_provider=args.ai_provider,
             claude_model=args.claude_model,
-            api_key_env=args.api_key_env
+            api_key_env=args.api_key_env,
         )
         demo.run()
 
@@ -94,6 +100,7 @@ def main():
     except Exception as e:
         print(f"Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

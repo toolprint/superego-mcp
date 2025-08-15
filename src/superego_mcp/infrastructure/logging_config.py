@@ -8,9 +8,7 @@ import structlog
 
 
 def configure_logging(
-    level: str = "INFO",
-    json_logs: bool = True,
-    stream: TextIO = sys.stdout
+    level: str = "INFO", json_logs: bool = True, stream: TextIO = sys.stdout
 ) -> None:
     """Configure structured logging for the application.
 
@@ -31,7 +29,7 @@ def configure_logging(
         format="%(message)s"
         if json_logs
         else "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        force=True  # Override existing configuration
+        force=True,  # Override existing configuration
     )
 
     # Configure structlog processors

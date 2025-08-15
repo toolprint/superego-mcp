@@ -273,62 +273,62 @@ class TestMultiTransportIntegration:
     # @pytest.mark.integration
     # @pytest.mark.asyncio
     # async def test_websocket_transport_functionality(self, integrated_server):
-        """Test WebSocket transport functionality."""
-        server = integrated_server
-
-        # Create WebSocket transport manually for testing
-        from superego_mcp.presentation.websocket_transport import (
-            WebSocketTransport,
-            WSMessage,
-        )
-
-        ws_transport = WebSocketTransport(
-            mcp=server.mcp,
-            security_policy=server.security_policy,
-            audit_logger=server.audit_logger,
-            error_handler=server.error_handler,
-            health_monitor=server.health_monitor,
-            config=server.config.transport.websocket.model_dump(),
-        )
-
-        # Test message handling directly
-        eval_message = WSMessage(
-            message_id="test-123",
-            type="evaluate",
-            data={
-                "tool_name": "test_tool",
-                "parameters": {"arg": "value"},
-                "agent_id": "test_agent",
-                "session_id": "test_session",
-                "cwd": "/tmp",
-            },
-        )
-
-        mock_websocket = None  # We'll test without actual websocket connection
-        response = await ws_transport._handle_message(eval_message, mock_websocket)
-
-        assert response is not None
-        assert response.message_id == "test-123"
-        assert response.type == "response"
-        assert response.data["action"] == "allow"
-
-        # Test health check message
-        health_message = WSMessage(message_id="health-123", type="health", data={})
-
-        response = await ws_transport._handle_message(health_message, mock_websocket)
-        assert response is not None
-        assert response.message_id == "health-123"
-        assert response.type == "response"
-        assert "status" in response.data
-
-        # Test ping message
-        ping_message = WSMessage(message_id="ping-123", type="ping", data={})
-
-        response = await ws_transport._handle_message(ping_message, mock_websocket)
-        assert response is not None
-        assert response.message_id == "ping-123"
-        assert response.type == "response"
-        assert response.data["pong"] is True
+    #     """Test WebSocket transport functionality."""
+    #     server = integrated_server
+    #
+    #     # Create WebSocket transport manually for testing
+    #     from superego_mcp.presentation.websocket_transport import (
+    #         WebSocketTransport,
+    #         WSMessage,
+    #     )
+    #
+    #     ws_transport = WebSocketTransport(
+    #         mcp=server.mcp,
+    #         security_policy=server.security_policy,
+    #         audit_logger=server.audit_logger,
+    #         error_handler=server.error_handler,
+    #         health_monitor=server.health_monitor,
+    #         config=server.config.transport.websocket.model_dump(),
+    #     )
+    #
+    #     # Test message handling directly
+    #     eval_message = WSMessage(
+    #         message_id="test-123",
+    #         type="evaluate",
+    #         data={
+    #             "tool_name": "test_tool",
+    #             "parameters": {"arg": "value"},
+    #             "agent_id": "test_agent",
+    #             "session_id": "test_session",
+    #             "cwd": "/tmp",
+    #         },
+    #     )
+    #
+    #     mock_websocket = None  # We'll test without actual websocket connection
+    #     response = await ws_transport._handle_message(eval_message, mock_websocket)
+    #
+    #     assert response is not None
+    #     assert response.message_id == "test-123"
+    #     assert response.type == "response"
+    #     assert response.data["action"] == "allow"
+    #
+    #     # Test health check message
+    #     health_message = WSMessage(message_id="health-123", type="health", data={})
+    #
+    #     response = await ws_transport._handle_message(health_message, mock_websocket)
+    #     assert response is not None
+    #     assert response.message_id == "health-123"
+    #     assert response.type == "response"
+    #     assert "status" in response.data
+    #
+    #     # Test ping message
+    #     ping_message = WSMessage(message_id="ping-123", type="ping", data={})
+    #
+    #     response = await ws_transport._handle_message(ping_message, mock_websocket)
+    #     assert response is not None
+    #     assert response.message_id == "ping-123"
+    #     assert response.type == "response"
+    #     assert response.data["pong"] is True
 
     @pytest.mark.integration
     @pytest.mark.asyncio

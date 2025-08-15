@@ -28,7 +28,7 @@ class TestCLIEvaluator:
             "cwd": "/tmp",
             "hook_event_name": "PreToolUse",
             "tool_name": "Bash",
-            "tool_input": {"command": "ls -la"}
+            "tool_input": {"command": "ls -la"},
         }
 
     @pytest.fixture
@@ -40,7 +40,7 @@ class TestCLIEvaluator:
             "cwd": "/tmp",
             "hook_event_name": "PreToolUse",
             "tool_name": "Bash",
-            "tool_input": {"command": "rm -rf /"}
+            "tool_input": {"command": "rm -rf /"},
         }
 
     def test_evaluator_initialization(self, evaluator):
@@ -53,7 +53,7 @@ class TestCLIEvaluator:
     @pytest.mark.asyncio
     async def test_evaluate_safe_command(self, evaluator, valid_hook_input):
         """Test evaluation of a safe command."""
-        with patch('sys.stdin', StringIO(json.dumps(valid_hook_input))):
+        with patch("sys.stdin", StringIO(json.dumps(valid_hook_input))):
             result = await evaluator.evaluate_from_stdin()
 
         assert "hookSpecificOutput" in result
@@ -65,7 +65,7 @@ class TestCLIEvaluator:
     @pytest.mark.asyncio
     async def test_evaluate_dangerous_command(self, evaluator, dangerous_hook_input):
         """Test evaluation of a dangerous command."""
-        with patch('sys.stdin', StringIO(json.dumps(dangerous_hook_input))):
+        with patch("sys.stdin", StringIO(json.dumps(dangerous_hook_input))):
             result = await evaluator.evaluate_from_stdin()
 
         assert "hookSpecificOutput" in result
@@ -77,14 +77,14 @@ class TestCLIEvaluator:
     @pytest.mark.asyncio
     async def test_evaluate_empty_input(self, evaluator):
         """Test evaluation with empty input."""
-        with patch('sys.stdin', StringIO("")):
+        with patch("sys.stdin", StringIO("")):
             with pytest.raises(ValueError, match="No input data received"):
                 await evaluator.evaluate_from_stdin()
 
     @pytest.mark.asyncio
     async def test_evaluate_invalid_json(self, evaluator):
         """Test evaluation with invalid JSON."""
-        with patch('sys.stdin', StringIO("invalid json")):
+        with patch("sys.stdin", StringIO("invalid json")):
             with pytest.raises(ValueError, match="Invalid JSON input"):
                 await evaluator.evaluate_from_stdin()
 
@@ -93,10 +93,10 @@ class TestCLIEvaluator:
         """Test evaluation with minimal input fields."""
         minimal_input = {
             "tool_name": "Write",
-            "tool_input": {"file_path": "test.txt", "content": "hello"}
+            "tool_input": {"file_path": "test.txt", "content": "hello"},
         }
 
-        with patch('sys.stdin', StringIO(json.dumps(minimal_input))):
+        with patch("sys.stdin", StringIO(json.dumps(minimal_input))):
             result = await evaluator.evaluate_from_stdin()
 
         assert "hookSpecificOutput" in result
@@ -122,7 +122,7 @@ class TestCLIEvaluator:
             cwd="/tmp",
             hook_event_name="PreToolUse",
             tool_name="Bash",
-            tool_input={"command": "echo hello"}
+            tool_input={"command": "echo hello"},
         )
 
         tool_request = evaluator._convert_to_tool_request(hook_input)
@@ -137,10 +137,10 @@ class TestCLIEvaluator:
         """Test detection of protected path access."""
         protected_input = {
             "tool_name": "Read",
-            "tool_input": {"file_path": "/etc/passwd"}
+            "tool_input": {"file_path": "/etc/passwd"},
         }
 
-        with patch('sys.stdin', StringIO(json.dumps(protected_input))):
+        with patch("sys.stdin", StringIO(json.dumps(protected_input))):
             result = await evaluator.evaluate_from_stdin()
 
         hook_output = result["hookSpecificOutput"]
@@ -161,7 +161,7 @@ class TestMockInferenceProvider:
         """Create a MockInferenceProvider with custom config."""
         config = {
             "dangerous_patterns": ["custom_danger"],
-            "protected_paths": ["/custom/path/"]
+            "protected_paths": ["/custom/path/"],
         }
         return MockInferenceProvider(config)
 
@@ -193,7 +193,7 @@ class TestMockInferenceProvider:
         tool_request = ToolRequest(
             tool_name="Write",
             parameters={"file_path": "safe.txt", "content": "hello"},
-            context={}
+            context={},
         )
 
         inference_request = InferenceRequest(
@@ -201,7 +201,7 @@ class TestMockInferenceProvider:
             tool_request=tool_request,
             rule=None,
             cache_key="test",
-            timeout_seconds=5
+            timeout_seconds=5,
         )
 
         decision = await provider.evaluate(inference_request)
@@ -218,9 +218,7 @@ class TestMockInferenceProvider:
         from superego_mcp.infrastructure.inference import InferenceRequest
 
         tool_request = ToolRequest(
-            tool_name="Bash",
-            parameters={"command": "rm -rf /important"},
-            context={}
+            tool_name="Bash", parameters={"command": "rm -rf /important"}, context={}
         )
 
         inference_request = InferenceRequest(
@@ -228,7 +226,7 @@ class TestMockInferenceProvider:
             tool_request=tool_request,
             rule=None,
             cache_key="test",
-            timeout_seconds=5
+            timeout_seconds=5,
         )
 
         decision = await provider.evaluate(inference_request)
@@ -245,9 +243,7 @@ class TestMockInferenceProvider:
         from superego_mcp.infrastructure.inference import InferenceRequest
 
         tool_request = ToolRequest(
-            tool_name="Test",
-            parameters={"data": "custom_danger here"},
-            context={}
+            tool_name="Test", parameters={"data": "custom_danger here"}, context={}
         )
 
         inference_request = InferenceRequest(
@@ -255,7 +251,7 @@ class TestMockInferenceProvider:
             tool_request=tool_request,
             rule=None,
             cache_key="test",
-            timeout_seconds=5
+            timeout_seconds=5,
         )
 
         decision = await custom_provider.evaluate(inference_request)
@@ -271,11 +267,11 @@ class TestMainFunction:
         """Test main function with valid input."""
         valid_input = {
             "tool_name": "Write",
-            "tool_input": {"file_path": "test.txt", "content": "hello"}
+            "tool_input": {"file_path": "test.txt", "content": "hello"},
         }
 
-        with patch('sys.stdin', StringIO(json.dumps(valid_input))):
-            with patch('sys.exit') as mock_exit:
+        with patch("sys.stdin", StringIO(json.dumps(valid_input))):
+            with patch("sys.exit") as mock_exit:
                 main()
                 mock_exit.assert_called_with(0)
 
@@ -285,8 +281,8 @@ class TestMainFunction:
 
     def test_main_with_invalid_input(self, capsys):
         """Test main function with invalid input."""
-        with patch('sys.stdin', StringIO("invalid json")):
-            with patch('sys.exit') as mock_exit:
+        with patch("sys.stdin", StringIO("invalid json")):
+            with patch("sys.exit") as mock_exit:
                 main()
                 mock_exit.assert_called_with(1)  # Non-blocking error
 
@@ -295,8 +291,8 @@ class TestMainFunction:
 
     def test_main_with_empty_input(self, capsys):
         """Test main function with empty input."""
-        with patch('sys.stdin', StringIO("")):
-            with patch('sys.exit') as mock_exit:
+        with patch("sys.stdin", StringIO("")):
+            with patch("sys.exit") as mock_exit:
                 main()
                 mock_exit.assert_called_with(1)  # Non-blocking error
 
@@ -307,10 +303,12 @@ class TestMainFunction:
         """Test main function with evaluation error."""
         valid_input = {"tool_name": "Test"}
 
-        with patch('sys.stdin', StringIO(json.dumps(valid_input))):
-            with patch('superego_mcp.cli_eval.CLIEvaluator.evaluate_from_stdin') as mock_eval:
+        with patch("sys.stdin", StringIO(json.dumps(valid_input))):
+            with patch(
+                "superego_mcp.cli_eval.CLIEvaluator.evaluate_from_stdin"
+            ) as mock_eval:
                 mock_eval.side_effect = RuntimeError("Evaluation failed")
-                with patch('sys.exit') as mock_exit:
+                with patch("sys.exit") as mock_exit:
                     main()
                     mock_exit.assert_called_with(2)  # Blocking error
 
@@ -319,9 +317,9 @@ class TestMainFunction:
 
     def test_main_with_unexpected_error(self, capsys):
         """Test main function with unexpected error."""
-        with patch('superego_mcp.cli_eval.CLIEvaluator') as mock_evaluator:
+        with patch("superego_mcp.cli_eval.CLIEvaluator") as mock_evaluator:
             mock_evaluator.side_effect = Exception("Unexpected error")
-            with patch('sys.exit') as mock_exit:
+            with patch("sys.exit") as mock_exit:
                 main()
                 mock_exit.assert_called_with(2)  # Blocking error
 

@@ -21,7 +21,7 @@ from .claude_code_models import (
     create_hook_output,
     validate_hook_input,
 )
-from .models import Decision, ErrorCode, SuperegoError, ToolAction, ToolRequest
+from .models import Decision, ErrorCode, SuperegoError, ToolRequest
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class HookIntegrationService:
     """Service for integrating Claude Code hooks with Superego domain models."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the hook integration service."""
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
@@ -120,13 +120,13 @@ class HookIntegrationService:
         try:
             # Convert Superego action to Claude Code permission
             permission_map = {
-                ToolAction.ALLOW: PermissionDecision.ALLOW,
-                ToolAction.DENY: PermissionDecision.DENY,
-                ToolAction.SAMPLE: PermissionDecision.ASK,  # Sample requires user approval
+                "allow": PermissionDecision.ALLOW,
+                "deny": PermissionDecision.DENY,
+                "sample": PermissionDecision.ASK,  # Sample requires user approval
             }
 
             # Determine if execution should continue
-            should_continue = decision.action in [ToolAction.ALLOW, ToolAction.SAMPLE]
+            should_continue = decision.action in ["allow", "sample"]
 
             # Set stop reason if execution is blocked
             stop_reason = None
@@ -151,7 +151,7 @@ class HookIntegrationService:
                     event_type=event_type,
                     continue_=should_continue,
                     stop_reason=stop_reason,
-                    block_output=decision.action == ToolAction.DENY,
+                    block_output=decision.action == "deny",
                     message=self._format_decision_message(decision)
                     if not should_continue
                     else None,
@@ -163,7 +163,7 @@ class HookIntegrationService:
                     event_type=event_type,
                     continue_=should_continue,
                     stop_reason=stop_reason,
-                    suppress_output=decision.action == ToolAction.DENY,
+                    suppress_output=decision.action == "deny",
                 )
 
         except Exception as e:
@@ -241,10 +241,10 @@ class HookIntegrationService:
             return PreToolUseOutput(
                 hookSpecificOutput=PreToolUseHookSpecificOutput(
                     permissionDecision=PermissionDecision.DENY,
-                    permissionDecisionReason="Critical error in security hook"
+                    permissionDecisionReason="Critical error in security hook",
                 ),
                 decision="block",
-                reason="Critical error in security hook"
+                reason="Critical error in security hook",
             )
 
     def _extract_agent_id(self, hook_input: HookInput) -> str:
@@ -272,9 +272,9 @@ class HookIntegrationService:
             Formatted message string
         """
         action_phrases = {
-            ToolAction.ALLOW: "Security check passed",
-            ToolAction.DENY: "Security check failed",
-            ToolAction.SAMPLE: "Security check requires approval",
+            "allow": "Security check passed",
+            "deny": "Security check failed",
+            "sample": "Security check requires approval",
         }
 
         action_phrase = action_phrases.get(
@@ -304,7 +304,7 @@ class HookIntegrationService:
         Returns:
             Context dictionary for tool evaluation
         """
-        context = {
+        context: dict[str, Any] = {
             "session_id": hook_input.session_id,
             "cwd": hook_input.cwd,
             "event_type": hook_input.hook_event_name.value,

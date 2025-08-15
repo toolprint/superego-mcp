@@ -29,8 +29,8 @@ class MultiTransportServer:
         error_handler: ErrorHandler,
         health_monitor: HealthMonitor,
         config: ServerConfig,
-        cli_transport: str = None,
-        cli_port: int = None,
+        cli_transport: str | None = None,
+        cli_port: int | None = None,
     ):
         """Initialize multi-transport server.
 
@@ -256,9 +256,13 @@ class MultiTransportServer:
                     host = "localhost"
 
                     # Use config values if available, otherwise defaults
-                    if hasattr(self.config, "transport") and hasattr(self.config.transport, "http"):
+                    if hasattr(self.config, "transport") and hasattr(
+                        self.config.transport, "http"
+                    ):
                         host = self.config.transport.http.host
-                        if not self.cli_port:  # Only use config port if CLI didn't override
+                        if (
+                            not self.cli_port
+                        ):  # Only use config port if CLI didn't override
                             port = self.config.transport.http.port
 
                     # Create HTTP config with CLI overrides
@@ -292,7 +296,10 @@ class MultiTransportServer:
                     transport_config = self.config.transport
 
                     # Start HTTP transport if enabled
-                    if hasattr(transport_config, "http") and transport_config.http.enabled:
+                    if (
+                        hasattr(transport_config, "http")
+                        and transport_config.http.enabled
+                    ):
                         self.http_transport = HTTPTransport(
                             mcp=self.mcp,
                             security_policy=self.security_policy,
@@ -310,9 +317,11 @@ class MultiTransportServer:
                             port=transport_config.http.port,
                         )
 
-
                     # Start SSE transport if enabled
-                    if hasattr(transport_config, "sse") and transport_config.sse.enabled:
+                    if (
+                        hasattr(transport_config, "sse")
+                        and transport_config.sse.enabled
+                    ):
                         self.sse_transport = SSETransport(
                             mcp=self.mcp,
                             security_policy=self.security_policy,
@@ -368,8 +377,7 @@ class MultiTransportServer:
             # Create a dedicated ThreadPoolExecutor for STDIO transport
             # This allows us to properly shut it down during cleanup
             self._stdio_executor = ThreadPoolExecutor(
-                max_workers=1,
-                thread_name_prefix="stdio-transport"
+                max_workers=1, thread_name_prefix="stdio-transport"
             )
 
             loop = asyncio.get_event_loop()
@@ -378,8 +386,7 @@ class MultiTransportServer:
             try:
                 await asyncio.wait_for(
                     loop.run_in_executor(
-                        self._stdio_executor,
-                        lambda: self.mcp.run(transport="stdio")
+                        self._stdio_executor, lambda: self.mcp.run(transport="stdio")
                     ),
                     timeout=None,  # STDIO should run indefinitely in production
                 )

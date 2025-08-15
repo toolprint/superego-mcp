@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "superego-mcp"
-version = "0.1.0"
-description = "Intelligent tool request interception for AI agents"
+version = "0.0.0"
+description = "Intelligent tool-call approvals for AI agents"
 requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "Superego MCP Team" },
+    { name = "Brian Cripe", email = "brian@onegrep.dev" },
 ]
 keywords = [
     "ai",

@@ -12,6 +12,7 @@ from pathlib import Path
 # Add src to path to import without installation
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+
 def test_cli_direct():
     """Test the CLI module directly."""
 
@@ -25,16 +26,13 @@ def test_cli_direct():
                 "cwd": "/tmp",
                 "hook_event_name": "PreToolUse",
                 "tool_name": "Bash",
-                "tool_input": {"command": "echo hello"}
-            }
+                "tool_input": {"command": "echo hello"},
+            },
         },
         {
             "name": "Dangerous command",
-            "input": {
-                "tool_name": "Bash",
-                "tool_input": {"command": "rm -rf /"}
-            }
-        }
+            "input": {"tool_name": "Bash", "tool_input": {"command": "rm -rf /"}},
+        },
     ]
 
     print("Testing CLI module directly...")
@@ -85,7 +83,9 @@ def test_cli_direct():
         except Exception as e:
             print(f"❌ Error: {e}")
             import traceback
+
             traceback.print_exc()
+
 
 if __name__ == "__main__":
     test_cli_direct()

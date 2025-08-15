@@ -25,6 +25,7 @@ from typing import Any
 import structlog
 
 from .domain.claude_code_models import (
+    HookEventName,
     PreToolUseHookSpecificOutput,
     PreToolUseOutput,
 )
@@ -42,13 +43,13 @@ from .infrastructure.logging_config import configure_stderr_logging
 class CLIEvaluator:
     """Standalone CLI evaluator for security decisions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the CLI evaluator."""
         self.logger = structlog.get_logger("cli_eval")
         self.hook_integration = HookIntegrationService()
         self._setup_inference_provider()
 
-    def _setup_inference_provider(self):
+    def _setup_inference_provider(self) -> None:
         """Set up the mock inference provider for standalone evaluation."""
         # Create mock inference provider
         self.mock_provider = MockInferenceProvider()
@@ -58,19 +59,18 @@ class CLIEvaluator:
             timeout_seconds=5,  # Quick timeout for CLI usage
             provider_preference=["mock_inference"],
             cli_providers=[],  # No CLI providers needed
-            api_providers=[]   # No API providers needed
+            api_providers=[],  # No API providers needed
         )
 
         # Create dependencies for inference manager
         dependencies = {
             "ai_service_manager": None,  # Not needed for mock provider
-            "prompt_builder": None       # Not needed for mock provider
+            "prompt_builder": None,  # Not needed for mock provider
         }
 
         # Create inference manager
         self.inference_manager = InferenceStrategyManager(
-            self.inference_config,
-            dependencies
+            self.inference_config, dependencies
         )
 
         # Manually add the mock provider since we're not using the standard initialization
@@ -96,7 +96,7 @@ class CLIEvaluator:
             try:
                 hook_input_raw = json.loads(input_data)
             except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON input: {e}")
+                raise ValueError(f"Invalid JSON input: {e}") from e
 
             # Extract fields from raw input (Claude Code format)
             session_id = hook_input_raw.get("session_id", "cli_eval_session")
@@ -115,7 +115,7 @@ class CLIEvaluator:
                 parameters=tool_input,
                 session_id=session_id,
                 agent_id="cli_eval",
-                cwd=cwd
+                cwd=cwd,
             )
 
             # Create inference request
@@ -124,7 +124,7 @@ class CLIEvaluator:
                 tool_request=tool_request,
                 rule=None,  # No specific rule for standalone mode
                 cache_key=f"cli_eval_{tool_name}_{hash(str(tool_input))}",
-                timeout_seconds=5
+                timeout_seconds=5,
             )
 
             # Evaluate using mock provider
@@ -136,9 +136,10 @@ class CLIEvaluator:
             return hook_output.model_dump(by_alias=True)
 
         except Exception as e:
-            self.logger.error("Evaluation failed", error=str(e), traceback=traceback.format_exc())
-            raise RuntimeError(f"Evaluation failed: {e}")
-
+            self.logger.error(
+                "Evaluation failed", error=str(e), traceback=traceback.format_exc()
+            )
+            raise RuntimeError(f"Evaluation failed: {e}") from e
 
     def _convert_decision_to_hook_output(self, decision: Any) -> PreToolUseOutput:
         """Convert inference decision to Claude Code hook output.
@@ -150,7 +151,7 @@ class CLIEvaluator:
             PreToolUseOutput formatted for Claude Code
         """
         # Map decision to permission decision
-        if hasattr(decision, 'decision'):
+        if hasattr(decision, "decision"):
             decision_str = decision.decision
         else:
             # Fallback for unexpected decision format
@@ -165,25 +166,27 @@ class CLIEvaluator:
             pass  # Safe default
 
         # Get reasoning
-        reasoning = getattr(decision, 'reasoning',
-                          f"Security evaluation completed (provider: {getattr(decision, 'provider', 'unknown')})")
+        reasoning = getattr(
+            decision,
+            "reasoning",
+            f"Security evaluation completed (provider: {getattr(decision, 'provider', 'unknown')})",
+        )
 
         # Create hook-specific output
         hook_specific_output = PreToolUseHookSpecificOutput(
-            hook_event_name="PreToolUse",
-            permission_decision=decision_str,
-            permission_decision_reason=reasoning
+            hookEventName=HookEventName.PRE_TOOL_USE,
+            permissionDecision=decision_str,
+            permissionDecisionReason=reasoning,
         )
 
         return PreToolUseOutput(
-            hook_specific_output=hook_specific_output,
+            hookSpecificOutput=hook_specific_output,
             decision="approve" if decision_str == "allow" else "block",
-            reason=reasoning
+            reason=reasoning,
         )
 
 
-
-def main():
+def main() -> None:
     """Main entry point for the CLI evaluator."""
     try:
         # Configure logging to stderr with minimal noise for CLI usage
@@ -196,7 +199,7 @@ def main():
         result = asyncio.run(evaluator.evaluate_from_stdin())
 
         # Output result as JSON to stdout
-        print(json.dumps(result, separators=(',', ':')))
+        print(json.dumps(result, separators=(",", ":")))
 
         # Exit with success
         sys.exit(0)
@@ -219,4 +222,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

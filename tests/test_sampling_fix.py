@@ -16,12 +16,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 try:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from superego_mcp.domain.models import (
-        Decision,
-        SecurityRule,
-        ToolAction,
         ToolRequest,
     )
     from superego_mcp.domain.security_policy import SecurityPolicyEngine
@@ -34,6 +31,7 @@ except ImportError as e:
 @dataclass
 class MockAIDecision:
     """Mock AI decision for testing."""
+
     decision: str
     reasoning: str
     confidence: float
@@ -54,19 +52,21 @@ class MockAIService:
         print(f"  🤖 Mock AI evaluating: {prompt[:50]}...")
 
         # Simple logic based on prompt content
-        if any(danger in prompt.lower() for danger in ['rm -rf', '/etc/passwd', 'sudo']):
+        if any(
+            danger in prompt.lower() for danger in ["rm -rf", "/etc/passwd", "sudo"]
+        ):
             return MockAIDecision(
                 decision="deny",
                 reasoning="Mock AI detected dangerous operation",
                 confidence=0.9,
-                risk_factors=["destructive_command"]
+                risk_factors=["destructive_command"],
             )
         else:
             return MockAIDecision(
                 decision="allow",
                 reasoning="Mock AI determined operation is safe",
                 confidence=0.8,
-                risk_factors=["monitoring_required"]
+                risk_factors=["monitoring_required"],
             )
 
     def get_health_status(self):
@@ -101,7 +101,7 @@ async def test_sample_rules():
         engine = SecurityPolicyEngine(
             rules_file=rules_file,
             ai_service_manager=mock_ai_service,
-            prompt_builder=mock_prompt_builder
+            prompt_builder=mock_prompt_builder,
         )
         print(f"✅ Security engine initialized with {len(engine.rules)} rules")
     except Exception as e:
@@ -114,26 +114,26 @@ async def test_sample_rules():
             "name": "Write file (should be sampled)",
             "tool_name": "Write",
             "parameters": {"file_path": "/tmp/test.txt", "content": "Hello"},
-            "expected_action": "sample"
+            "expected_action": "sample",
         },
         {
             "name": "Execute safe command (should be sampled)",
             "tool_name": "Bash",
             "parameters": {"command": "echo hello", "description": "Test command"},
-            "expected_action": "sample"
+            "expected_action": "sample",
         },
         {
             "name": "Read safe file (should be allowed)",
             "tool_name": "Read",
             "parameters": {"file_path": "/home/user/test.txt"},
-            "expected_action": "allow"
+            "expected_action": "allow",
         },
         {
             "name": "Dangerous system command (should be denied)",
             "tool_name": "Bash",
             "parameters": {"command": "rm -rf /", "description": "Destroy system"},
-            "expected_action": "deny"
-        }
+            "expected_action": "deny",
+        },
     ]
 
     results = {"total": 0, "allow": 0, "deny": 0, "sample": 0, "errors": 0}
@@ -148,7 +148,7 @@ async def test_sample_rules():
             session_id="test-session",
             agent_id="test-agent",
             cwd="/tmp",
-            timestamp=datetime.now(UTC)
+            timestamp=datetime.now(UTC),
         )
 
         try:
@@ -186,8 +186,10 @@ async def test_sample_rules():
     print(f"Errors: {results['errors']}")
 
     # Check if sampling worked
-    if results['sample'] > 0:
-        print(f"\n✅ SUCCESS: SAMPLE rules are working! Got {results['sample']} sampled decisions.")
+    if results["sample"] > 0:
+        print(
+            f"\n✅ SUCCESS: SAMPLE rules are working! Got {results['sample']} sampled decisions."
+        )
         return True
     else:
         print("\n❌ FAILURE: No SAMPLE actions occurred. Check rule configuration.")

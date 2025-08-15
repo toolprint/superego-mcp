@@ -71,8 +71,6 @@ class HTTPTransportConfig(TransportConfig):
     port: int = Field(default=8000, description="HTTP server port")
 
 
-
-
 class SSETransportConfig(TransportConfig):
     """Server-Sent Events transport configuration."""
 

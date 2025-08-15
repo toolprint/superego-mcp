@@ -277,7 +277,9 @@ class SecurityPolicyEngine:
                 rule_id=rule.id,
                 confidence=ai_decision.confidence,
                 processing_time_ms=processing_time_ms,
-                ai_provider=ai_decision.provider if isinstance(ai_decision.provider, str) else ai_decision.provider.value,
+                ai_provider=ai_decision.provider
+                if isinstance(ai_decision.provider, str)
+                else ai_decision.provider.value,
                 ai_model=ai_decision.model,
                 risk_factors=ai_decision.risk_factors,
             )
@@ -457,7 +459,7 @@ class SecurityPolicyEngine:
                     # No event loop, safe to run async code
                     import asyncio
 
-                    async def get_inference_health():
+                    async def get_inference_health() -> Any:
                         return await self.inference_manager.health_check()
 
                     try:
