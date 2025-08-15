@@ -3,6 +3,7 @@
 import asyncio
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import structlog
@@ -14,7 +15,6 @@ from ..infrastructure.config import ServerConfig
 from ..infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
 from .http_transport import HTTPTransport
 from .sse_transport import SSETransport
-from .websocket_transport import WebSocketTransport
 
 logger = structlog.get_logger(__name__)
 
@@ -29,6 +29,8 @@ class MultiTransportServer:
         error_handler: ErrorHandler,
         health_monitor: HealthMonitor,
         config: ServerConfig,
+        cli_transport: str = None,
+        cli_port: int = None,
     ):
         """Initialize multi-transport server.
 
@@ -38,12 +40,16 @@ class MultiTransportServer:
             error_handler: Error handler instance
             health_monitor: Health monitor instance
             config: Server configuration
+            cli_transport: CLI override for transport mode (stdio/http)
+            cli_port: CLI override for HTTP port
         """
         self.security_policy = security_policy
         self.audit_logger = audit_logger
         self.error_handler = error_handler
         self.health_monitor = health_monitor
         self.config = config
+        self.cli_transport = cli_transport
+        self.cli_port = cli_port
 
         # Initialize FastMCP with multi-transport support
         self.mcp: FastMCP = FastMCP(
@@ -53,11 +59,11 @@ class MultiTransportServer:
 
         # Transport handlers
         self.http_transport: HTTPTransport | None = None
-        self.websocket_transport: WebSocketTransport | None = None
         self.sse_transport: SSETransport | None = None
 
-        # Running tasks
+        # Running tasks and executor management
         self.transport_tasks: list[asyncio.Task[Any]] = []
+        self._stdio_executor: ThreadPoolExecutor | None = None
 
         self._setup_core_tools()
 
@@ -221,11 +227,6 @@ class MultiTransportServer:
             transport_config = self.config.transport
             if hasattr(transport_config, "http") and transport_config.http.enabled:
                 enabled.append("http")
-            if (
-                hasattr(transport_config, "websocket")
-                and transport_config.websocket.enabled
-            ):
-                enabled.append("websocket")
             if hasattr(transport_config, "sse") and transport_config.sse.enabled:
                 enabled.append("sse")
 
@@ -236,77 +237,106 @@ class MultiTransportServer:
         logger.info("Starting Superego MCP multi-transport server")
 
         try:
-            # Get transport configuration
-            if hasattr(self.config, "transport"):
-                transport_config = self.config.transport
-
-                # Start HTTP transport if enabled
-                if hasattr(transport_config, "http") and transport_config.http.enabled:
+            # Handle CLI transport override
+            if self.cli_transport:
+                logger.info(f"CLI transport override: {self.cli_transport}")
+                
+                if self.cli_transport == "stdio":
+                    # Start only STDIO transport
+                    if not self._is_test_environment():
+                        stdio_task = asyncio.create_task(self._run_stdio_transport())
+                        self.transport_tasks.append(stdio_task)
+                        logger.info("STDIO transport started (CLI override)")
+                    else:
+                        logger.info("STDIO transport skipped in test environment")
+                        
+                elif self.cli_transport == "http":
+                    # Start only HTTP transport with CLI port override
+                    port = self.cli_port or 8000
+                    host = "localhost"
+                    
+                    # Use config values if available, otherwise defaults
+                    if hasattr(self.config, "transport") and hasattr(self.config.transport, "http"):
+                        host = self.config.transport.http.host
+                        if not self.cli_port:  # Only use config port if CLI didn't override
+                            port = self.config.transport.http.port
+                    
+                    # Create HTTP config with CLI overrides
+                    http_config = {
+                        "host": host,
+                        "port": port,
+                        "enabled": True,
+                    }
+                    
                     self.http_transport = HTTPTransport(
                         mcp=self.mcp,
                         security_policy=self.security_policy,
                         audit_logger=self.audit_logger,
                         error_handler=self.error_handler,
                         health_monitor=self.health_monitor,
-                        config=transport_config.http.model_dump(),
+                        config=http_config,
                     )
                     assert self.http_transport is not None
                     http_task = asyncio.create_task(self.http_transport.start())
                     self.transport_tasks.append(http_task)
                     logger.info(
-                        "HTTP transport started",
-                        host=transport_config.http.host,
-                        port=transport_config.http.port,
+                        "HTTP transport started (CLI override)",
+                        host=host,
+                        port=port,
                     )
-
-                # Start WebSocket transport if enabled
-                if (
-                    hasattr(transport_config, "websocket")
-                    and transport_config.websocket.enabled
-                ):
-                    self.websocket_transport = WebSocketTransport(
-                        mcp=self.mcp,
-                        security_policy=self.security_policy,
-                        audit_logger=self.audit_logger,
-                        error_handler=self.error_handler,
-                        health_monitor=self.health_monitor,
-                        config=transport_config.websocket.model_dump(),
-                    )
-                    assert self.websocket_transport is not None
-                    ws_task = asyncio.create_task(self.websocket_transport.start())
-                    self.transport_tasks.append(ws_task)
-                    logger.info(
-                        "WebSocket transport started",
-                        host=transport_config.websocket.host,
-                        port=transport_config.websocket.port,
-                    )
-
-                # Start SSE transport if enabled
-                if hasattr(transport_config, "sse") and transport_config.sse.enabled:
-                    self.sse_transport = SSETransport(
-                        mcp=self.mcp,
-                        security_policy=self.security_policy,
-                        audit_logger=self.audit_logger,
-                        error_handler=self.error_handler,
-                        health_monitor=self.health_monitor,
-                        config=transport_config.sse.model_dump(),
-                    )
-                    assert self.sse_transport is not None
-                    sse_task = asyncio.create_task(self.sse_transport.start())
-                    self.transport_tasks.append(sse_task)
-                    logger.info(
-                        "SSE transport started",
-                        host=transport_config.sse.host,
-                        port=transport_config.sse.port,
-                    )
-
-            # Start STDIO transport (skip in test environment to avoid blocking)
-            if not self._is_test_environment():
-                stdio_task = asyncio.create_task(self._run_stdio_transport())
-                self.transport_tasks.append(stdio_task)
-                logger.info("STDIO transport started")
+                    
             else:
-                logger.info("STDIO transport skipped in test environment")
+                # Normal config-based startup
+                # Get transport configuration
+                if hasattr(self.config, "transport"):
+                    transport_config = self.config.transport
+
+                    # Start HTTP transport if enabled
+                    if hasattr(transport_config, "http") and transport_config.http.enabled:
+                        self.http_transport = HTTPTransport(
+                            mcp=self.mcp,
+                            security_policy=self.security_policy,
+                            audit_logger=self.audit_logger,
+                            error_handler=self.error_handler,
+                            health_monitor=self.health_monitor,
+                            config=transport_config.http.model_dump(),
+                        )
+                        assert self.http_transport is not None
+                        http_task = asyncio.create_task(self.http_transport.start())
+                        self.transport_tasks.append(http_task)
+                        logger.info(
+                            "HTTP transport started",
+                            host=transport_config.http.host,
+                            port=transport_config.http.port,
+                        )
+
+
+                    # Start SSE transport if enabled
+                    if hasattr(transport_config, "sse") and transport_config.sse.enabled:
+                        self.sse_transport = SSETransport(
+                            mcp=self.mcp,
+                            security_policy=self.security_policy,
+                            audit_logger=self.audit_logger,
+                            error_handler=self.error_handler,
+                            health_monitor=self.health_monitor,
+                            config=transport_config.sse.model_dump(),
+                        )
+                        assert self.sse_transport is not None
+                        sse_task = asyncio.create_task(self.sse_transport.start())
+                        self.transport_tasks.append(sse_task)
+                        logger.info(
+                            "SSE transport started",
+                            host=transport_config.sse.host,
+                            port=transport_config.sse.port,
+                        )
+
+                # Start STDIO transport (skip in test environment to avoid blocking)
+                if not self._is_test_environment():
+                    stdio_task = asyncio.create_task(self._run_stdio_transport())
+                    self.transport_tasks.append(stdio_task)
+                    logger.info("STDIO transport started")
+                else:
+                    logger.info("STDIO transport skipped in test environment")
 
             if self.transport_tasks:
                 # Wait for all transport tasks with timeout to prevent infinite blocking
@@ -335,17 +365,22 @@ class MultiTransportServer:
     async def _run_stdio_transport(self) -> None:
         """Run STDIO transport in async context."""
         try:
-            # For async context, we need to handle STDIO differently
-            # Since FastMCP's run() is synchronous, we run it in a separate task
-            import asyncio
+            # Create a dedicated ThreadPoolExecutor for STDIO transport
+            # This allows us to properly shut it down during cleanup
+            self._stdio_executor = ThreadPoolExecutor(
+                max_workers=1, 
+                thread_name_prefix="stdio-transport"
+            )
 
             loop = asyncio.get_event_loop()
 
-            # Run STDIO transport in executor to avoid blocking
-            # Add timeout as defensive measure
+            # Run STDIO transport in dedicated executor
             try:
                 await asyncio.wait_for(
-                    loop.run_in_executor(None, lambda: self.mcp.run(transport="stdio")),
+                    loop.run_in_executor(
+                        self._stdio_executor, 
+                        lambda: self.mcp.run(transport="stdio")
+                    ),
                     timeout=None,  # STDIO should run indefinitely in production
                 )
             except TimeoutError:
@@ -357,6 +392,11 @@ class MultiTransportServer:
         except Exception as e:
             logger.error("STDIO transport failed", error=str(e))
             raise
+        finally:
+            # Ensure executor cleanup
+            if self._stdio_executor:
+                self._stdio_executor.shutdown(wait=False)
+                self._stdio_executor = None
 
     async def stop(self) -> None:
         """Stop all running transports gracefully."""
@@ -384,8 +424,6 @@ class MultiTransportServer:
             shutdown_tasks = []
             if self.http_transport:
                 shutdown_tasks.append(self.http_transport.stop())
-            if self.websocket_transport:
-                shutdown_tasks.append(self.websocket_transport.stop())
             if self.sse_transport:
                 shutdown_tasks.append(self.sse_transport.stop())
 
@@ -399,6 +437,23 @@ class MultiTransportServer:
                     logger.warning(
                         "Some transports did not stop gracefully within timeout"
                     )
+
+            # Forcefully shutdown the STDIO executor if it exists
+            if self._stdio_executor:
+                logger.info("Shutting down STDIO transport executor")
+                try:
+                    # Try graceful shutdown first with a very short timeout
+                    self._stdio_executor.shutdown(wait=False)
+                    
+                    # Give it a moment to shutdown gracefully
+                    await asyncio.sleep(0.1)
+                    
+                    # If that doesn't work, we'll rely on the signal handler to force exit
+                    logger.info("STDIO executor shutdown initiated")
+                except Exception as e:
+                    logger.warning(f"Error during executor shutdown: {e}")
+                finally:
+                    self._stdio_executor = None
 
         except Exception as e:
             logger.error("Error during server shutdown", error=str(e))
@@ -459,19 +514,7 @@ class MultiTransportServer:
                             )
                             # Note: Don't actually start the server for testing
 
-                        # Similar setup for WebSocket and SSE without starting servers
-                        if (
-                            hasattr(transport_config, "websocket")
-                            and transport_config.websocket.enabled
-                        ):
-                            self.server.websocket_transport = WebSocketTransport(
-                                mcp=self.server.mcp,
-                                security_policy=self.server.security_policy,
-                                audit_logger=self.server.audit_logger,
-                                error_handler=self.server.error_handler,
-                                health_monitor=self.server.health_monitor,
-                                config=transport_config.websocket.model_dump(),
-                            )
+                        # Similar setup for SSE without starting servers
 
                         if (
                             hasattr(transport_config, "sse")

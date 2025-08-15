@@ -32,8 +32,17 @@ def main() -> None:
         sys.exit(1)
 
 
-async def async_main() -> None:
+async def async_main(transport: str = None, port: int = None) -> None:
     """Async main function with lifecycle management"""
+    # Configure logging based on transport type
+    if transport == "stdio":
+        from .infrastructure.logging_config import configure_stderr_logging
+        configure_stderr_logging(level="INFO", json_logs=False)
+    else:
+        # For http or default, use standard logging
+        from .infrastructure.logging_config import configure_logging
+        configure_logging(level="INFO", json_logs=False)
+    
     # Load configuration
     config_manager = ConfigManager()
     config = config_manager.load_config()
@@ -137,18 +146,33 @@ async def async_main() -> None:
         error_handler=error_handler,
         health_monitor=health_monitor,
         config=config,
+        cli_transport=transport,
+        cli_port=port,
     )
 
     # Setup graceful shutdown
     shutdown_event = asyncio.Event()
+    shutdown_count = 0
 
-    def signal_handler() -> None:
-        print("\nShutdown signal received...")
-        shutdown_event.set()
+    def signal_handler(signum: int, frame) -> None:
+        nonlocal shutdown_count
+        shutdown_count += 1
+        
+        if shutdown_count == 1:
+            print("\nShutdown signal received...")
+            shutdown_event.set()
+        elif shutdown_count == 2:
+            print("\nSecond shutdown signal received, forcing exit...")
+            import os
+            os._exit(1)
+        else:
+            print("\nMultiple shutdown signals received, forcing immediate exit...")
+            import os
+            os._exit(2)
 
     # Register signal handlers for graceful shutdown
     for sig in [signal.SIGTERM, signal.SIGINT]:
-        signal.signal(sig, lambda s, f: signal_handler())
+        signal.signal(sig, signal_handler)
 
     try:
         # Start config watcher
@@ -207,6 +231,9 @@ async def async_main() -> None:
             await inference_manager.cleanup()
 
         print("Server shutdown complete")
+        
+        # Add a small delay to allow any final cleanup
+        await asyncio.sleep(0.1)
 
 
 def run_server_with_stdio() -> None:

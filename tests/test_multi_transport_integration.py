@@ -75,12 +75,6 @@ def temp_config_files():
                     "port": 18000,  # Use different port for testing
                     "cors_origins": ["*"],
                 },
-                "websocket": {
-                    "enabled": True,
-                    "host": "127.0.0.1",
-                    "port": 18001,
-                    "cors_origins": ["*"],
-                },
                 "sse": {
                     "enabled": True,
                     "host": "127.0.0.1",
@@ -155,7 +149,6 @@ class TestMultiTransportIntegration:
         # Test enabled transports (STDIO not enabled in test environment)
         enabled = server._get_enabled_transports()
         assert "http" in enabled
-        assert "websocket" in enabled
         assert "sse" in enabled
 
         # Test that we can get the MCP app
@@ -276,9 +269,10 @@ class TestMultiTransportIntegration:
         data = response.json()
         assert "audit_stats" in data
 
-    @pytest.mark.integration
-    @pytest.mark.asyncio
-    async def test_websocket_transport_functionality(self, integrated_server):
+    # WebSocket transport removed - test disabled
+    # @pytest.mark.integration
+    # @pytest.mark.asyncio
+    # async def test_websocket_transport_functionality(self, integrated_server):
         """Test WebSocket transport functionality."""
         server = integrated_server
 

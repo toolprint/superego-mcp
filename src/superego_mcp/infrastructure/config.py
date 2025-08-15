@@ -71,16 +71,6 @@ class HTTPTransportConfig(TransportConfig):
     port: int = Field(default=8000, description="HTTP server port")
 
 
-class WebSocketTransportConfig(TransportConfig):
-    """WebSocket transport configuration."""
-
-    port: int = Field(default=8001, description="WebSocket server port")
-    ping_interval: int = Field(
-        default=20, description="WebSocket ping interval in seconds"
-    )
-    ping_timeout: int = Field(
-        default=30, description="WebSocket ping timeout in seconds"
-    )
 
 
 class SSETransportConfig(TransportConfig):
@@ -100,10 +90,6 @@ class MultiTransportConfig(BaseModel):
     )
     http: HTTPTransportConfig = Field(
         default_factory=HTTPTransportConfig, description="HTTP transport config"
-    )
-    websocket: WebSocketTransportConfig = Field(
-        default_factory=WebSocketTransportConfig,
-        description="WebSocket transport config",
     )
     sse: SSETransportConfig = Field(
         default_factory=SSETransportConfig, description="SSE transport config"

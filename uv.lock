@@ -2896,7 +2896,6 @@ demo = [
     { name = "fast-agent-mcp", version = "0.2.36", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "fast-agent-mcp", version = "0.2.49", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.12.*'" },
     { name = "fast-agent-mcp", version = "0.2.54", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
-    { name = "websockets" },
 ]
 dev = [
     { name = "mypy" },
@@ -2981,7 +2980,6 @@ requires-dist = [
     { name = "watchfiles", specifier = ">=0.20.0" },
     { name = "watchfiles", marker = "extra == 'all'", specifier = ">=0.20.0" },
     { name = "watchfiles", marker = "extra == 'server'", specifier = ">=0.20.0" },
-    { name = "websockets", marker = "extra == 'demo'", specifier = ">=12.0" },
 ]
 provides-extras = ["core", "server", "cli", "all", "demo", "dev"]
 

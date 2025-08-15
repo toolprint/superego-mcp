@@ -19,7 +19,6 @@ from superego_mcp.infrastructure.error_handler import (
 from superego_mcp.presentation.http_transport import HTTPTransport
 from superego_mcp.presentation.sse_transport import SSETransport
 from superego_mcp.presentation.transport_server import MultiTransportServer
-from superego_mcp.presentation.websocket_transport import WebSocketTransport
 
 # Ensure test environment is detected
 os.environ["TESTING"] = "1"
@@ -73,12 +72,6 @@ def test_config():
                 "port": 8000,
                 "cors_origins": ["*"],
             },
-            "websocket": {
-                "enabled": True,
-                "host": "127.0.0.1",
-                "port": 8001,
-                "cors_origins": ["*"],
-            },
             "sse": {
                 "enabled": True,
                 "host": "127.0.0.1",
@@ -127,7 +120,6 @@ class TestMultiTransportServer:
         enabled = server._get_enabled_transports()
         # STDIO is not enabled in test environment
         assert "http" in enabled
-        assert "websocket" in enabled
         assert "sse" in enabled
 
     @pytest.mark.asyncio
@@ -287,102 +279,6 @@ class TestHTTPTransport:
         assert data["reason"] == "Test allowed"
         assert data["confidence"] == 0.9
 
-
-class TestWebSocketTransport:
-    """Test cases for WebSocket transport."""
-
-    @pytest.fixture
-    def ws_transport(self, mock_components):
-        """Create WebSocket transport for testing."""
-        security_policy, audit_logger, error_handler, health_monitor = mock_components
-
-        # Create a mock FastMCP instance
-        mock_mcp = Mock()
-
-        config = {
-            "enabled": True,
-            "host": "127.0.0.1",
-            "port": 8001,
-            "cors_origins": ["*"],
-        }
-
-        return WebSocketTransport(
-            mcp=mock_mcp,
-            security_policy=security_policy,
-            audit_logger=audit_logger,
-            error_handler=error_handler,
-            health_monitor=health_monitor,
-            config=config,
-        )
-
-    def test_ws_transport_initialization(self, ws_transport):
-        """Test WebSocket transport initialization."""
-        assert ws_transport.app is not None
-        assert ws_transport.connection_manager is not None
-        assert ws_transport.config["enabled"] is True
-        assert ws_transport.config["port"] == 8001
-
-    def test_connection_manager(self, ws_transport):
-        """Test WebSocket connection manager."""
-        manager = ws_transport.connection_manager
-
-        # Test subscription management
-        mock_websocket = Mock()
-
-        # Test subscribe
-        assert manager.subscribe(mock_websocket, "health") is True
-        assert mock_websocket in manager.subscriptions["health"]
-
-        # Test unsubscribe
-        assert manager.unsubscribe(mock_websocket, "health") is True
-        assert mock_websocket not in manager.subscriptions["health"]
-
-        # Test invalid subscription type
-        assert manager.subscribe(mock_websocket, "invalid") is False
-
-    @pytest.mark.asyncio
-    async def test_ws_message_handling(self, ws_transport, mock_components):
-        """Test WebSocket message handling."""
-        security_policy, audit_logger, error_handler, health_monitor = mock_components
-
-        # Setup mock decision
-        mock_decision = Decision(
-            action="allow",
-            reason="Test allowed",
-            confidence=0.9,
-            processing_time_ms=10,
-            rule_id="test-rule",
-        )
-
-        async def mock_evaluate(request):
-            return mock_decision
-
-        security_policy.evaluate = mock_evaluate
-        audit_logger.log_decision = AsyncMock()
-
-        # Create mock message
-        from superego_mcp.presentation.websocket_transport import WSMessage
-
-        message = WSMessage(
-            message_id="test-123",
-            type="evaluate",
-            data={
-                "tool_name": "test_tool",
-                "parameters": {"arg": "value"},
-                "agent_id": "test_agent",
-                "session_id": "test_session",
-                "cwd": "/tmp",
-            },
-        )
-
-        mock_websocket = Mock()
-
-        response = await ws_transport._handle_message(message, mock_websocket)
-
-        assert response is not None
-        assert response.message_id == "test-123"
-        assert response.type == "response"
-        assert response.data["action"] == "allow"
 
 
 class TestSSETransport:

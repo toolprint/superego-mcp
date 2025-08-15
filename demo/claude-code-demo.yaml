@@ -106,9 +106,6 @@ transport:
     port: 8000
     cors_origins: ["*"]
     
-  websocket:
-    enabled: false  # Disabled for simpler demo
-    
   sse:
     enabled: false  # Disabled for simpler demo
 

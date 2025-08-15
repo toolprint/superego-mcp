@@ -82,14 +82,6 @@ transport:
     port: 8000
     cors_origins: ["*"]
     
-  websocket:
-    enabled: true
-    host: "0.0.0.0"
-    port: 8001
-    cors_origins: ["*"]
-    ping_interval: 20
-    ping_timeout: 30
-    
   sse:
     enabled: true
     host: "0.0.0.0"

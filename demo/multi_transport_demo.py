@@ -6,7 +6,6 @@ import time
 from typing import Any
 
 import httpx
-import websockets
 from httpx import AsyncClient
 
 
@@ -23,7 +22,6 @@ class MultiTransportDemo:
         self.base_url = base_url
         self.ports = ports or {
             "http": 8000,
-            "websocket": 8001,
             "sse": 8002,
         }
 

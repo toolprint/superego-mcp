@@ -28,8 +28,8 @@ from .main import async_main as mcp_async_main
 from .infrastructure.logging_config import configure_stderr_logging
 
 
-async def mcp_async_main_with_config(config_path: Path) -> None:
-    """Run MCP server with custom config path.
+async def mcp_async_main_with_config(config_path: Path, transport: Optional[str] = None, port: Optional[int] = None) -> None:
+    """Run MCP server with custom config path and optional CLI overrides.
     
     This is a wrapper around the main async_main that sets up
     a custom ConfigManager before launching the server.
@@ -46,8 +46,8 @@ async def mcp_async_main_with_config(config_path: Path) -> None:
     import os
     os.environ['SUPEREGO_CONFIG_PATH'] = str(config_path)
     
-    # Run the main server
-    await mcp_async_main()
+    # Run the main server with CLI overrides
+    await mcp_async_main(transport=transport, port=port)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -64,11 +64,17 @@ Examples:
   # Run evaluation with custom config
   superego advise -c ~/.toolprint/superego/config.yaml < hook_input.json
   
-  # Launch MCP server
+  # Launch MCP server (default: stdio transport)
   superego mcp
+  
+  # Launch MCP server with HTTP transport on custom port
+  superego mcp -t http -p 9000
   
   # Launch MCP server with custom config
   superego mcp -c ~/.toolprint/superego/config.yaml
+  
+  # Launch MCP server with explicit stdio transport
+  superego mcp -t stdio
   
   # Manage Claude Code hooks
   superego hooks add --matcher "Bash|Write|Edit|MultiEdit"
@@ -185,11 +191,16 @@ Provides rule management and security evaluation tools for AI agents.
 Default Configuration:
   - Config path: ~/.toolprint/superego/config.yaml
   - Inference provider: Claude CLI (requires Claude Code installation)
-  - Transport: HTTP mode with WebSocket support
-  - Port: 8000 (configurable)
+  - Transport: STDIO mode (configurable with -t/--transport)
+  - Port: 8000 for HTTP mode (configurable with -p/--port)
+
+Transport Options:
+  - stdio: Standard I/O transport (default, uses stderr for logging)
+  - http: HTTP transport on specified port (uses stdout for logging)
 
 The server will validate Claude CLI availability on startup.
 If Claude is not available, the server will exit with an error.
+Signal handling: Ctrl-C (SIGINT) and SIGTERM will cleanly shut down the server.
         """,
     )
     
@@ -205,6 +216,23 @@ If Claude is not available, the server will exit with an error.
         action="store_true",
         help="Validate Claude CLI availability on startup (default: true)",
         default=True,
+    )
+    
+    mcp_parser.add_argument(
+        "-t", "--transport",
+        type=str,
+        choices=["stdio", "http"],
+        default="stdio",
+        help="Transport mode for the MCP server (default: stdio)",
+        metavar="TRANSPORT",
+    )
+    
+    mcp_parser.add_argument(
+        "-p", "--port",
+        type=int,
+        default=8000,
+        help="Port for HTTP transport mode (default: 8000)",
+        metavar="PORT",
     )
     
     # Create the hooks subcommand
@@ -444,15 +472,15 @@ async def cmd_mcp(args: argparse.Namespace) -> int:
         # Update main.py to use custom config path if provided
         if args.config:
             print(f"Using configuration from: {config_path}")
-            await mcp_async_main_with_config(config_path)
+            await mcp_async_main_with_config(config_path, transport=args.transport, port=args.port)
         else:
             # Check if default config path exists
             if config_path.exists():
                 print(f"Using default configuration from: {config_path}")
-                await mcp_async_main_with_config(config_path)
+                await mcp_async_main_with_config(config_path, transport=args.transport, port=args.port)
             else:
                 print("Using default configuration (no config file found)")
-                await mcp_async_main()
+                await mcp_async_main(transport=args.transport, port=args.port)
         
         return 0
         
