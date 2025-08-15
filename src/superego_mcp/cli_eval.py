@@ -7,7 +7,7 @@ evaluations that can be used as a Claude Code PreToolUse hook. It reads
 JSON input from stdin and returns decision JSON on stdout.
 
 Usage:
-    echo '{"hook_data"}' | superego-eval
+    echo '{"hook_data"}' | superego advise
 
 Exit Codes:
     0: Success with JSON output on stdout
@@ -33,6 +33,7 @@ from .infrastructure.inference import (
     InferenceConfig,
     InferenceStrategyManager,
 )
+from .infrastructure.logging_config import configure_stderr_logging
 
 
 class CLIEvaluator:
@@ -182,13 +183,8 @@ class CLIEvaluator:
 def main():
     """Main entry point for the CLI evaluator."""
     try:
-        # Set up minimal logging to stderr (won't interfere with stdout JSON)
-        import logging
-        logging.basicConfig(
-            level=logging.WARNING,  # Only show warnings/errors
-            format='%(message)s',
-            stream=sys.stderr
-        )
+        # Configure logging to stderr with minimal noise for CLI usage
+        configure_stderr_logging(level="WARNING", json_logs=False)
 
         # Create evaluator
         evaluator = CLIEvaluator()

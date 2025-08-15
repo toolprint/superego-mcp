@@ -2870,6 +2870,28 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "aiohttp" },
+    { name = "aiohttp-sse" },
+    { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "httpx" },
+    { name = "prometheus-client" },
+    { name = "psutil" },
+    { name = "python-dateutil" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "watchfiles" },
+]
+cli = [
+    { name = "httpx" },
+    { name = "python-dateutil" },
+]
+core = [
+    { name = "jsonpath-ng" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+]
 demo = [
     { name = "fast-agent-mcp", version = "0.2.36", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "fast-agent-mcp", version = "0.2.49", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.12.*'" },
@@ -2883,7 +2905,19 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "types-psutil" },
+    { name = "types-python-dateutil" },
     { name = "types-pyyaml" },
+]
+server = [
+    { name = "aiohttp" },
+    { name = "aiohttp-sse" },
+    { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "prometheus-client" },
+    { name = "psutil" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "watchfiles" },
 ]
 
 [package.dev-dependencies]
@@ -2899,31 +2933,57 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.9.0" },
+    { name = "aiohttp", marker = "extra == 'all'", specifier = ">=3.9.0" },
+    { name = "aiohttp", marker = "extra == 'server'", specifier = ">=3.9.0" },
     { name = "aiohttp-sse", specifier = ">=2.1.0" },
+    { name = "aiohttp-sse", marker = "extra == 'all'", specifier = ">=2.1.0" },
+    { name = "aiohttp-sse", marker = "extra == 'server'", specifier = ">=2.1.0" },
     { name = "fast-agent-mcp", marker = "extra == 'demo'", specifier = ">=0.1.0" },
     { name = "fastapi", specifier = ">=0.104.0" },
+    { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.104.0" },
+    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.104.0" },
     { name = "fastmcp", specifier = ">=2.0.0" },
+    { name = "fastmcp", marker = "extra == 'all'", specifier = ">=2.0.0" },
+    { name = "fastmcp", marker = "extra == 'server'", specifier = ">=2.0.0" },
     { name = "httpx", specifier = ">=0.25.0" },
+    { name = "httpx", marker = "extra == 'all'", specifier = ">=0.25.0" },
+    { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.25.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "jsonpath-ng", specifier = ">=1.6.0" },
+    { name = "jsonpath-ng", marker = "extra == 'core'", specifier = ">=1.6.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.0" },
     { name = "prometheus-client", specifier = ">=0.19.0" },
+    { name = "prometheus-client", marker = "extra == 'all'", specifier = ">=0.19.0" },
+    { name = "prometheus-client", marker = "extra == 'server'", specifier = ">=0.19.0" },
     { name = "psutil", specifier = ">=5.9.0" },
+    { name = "psutil", marker = "extra == 'all'", specifier = ">=5.9.0" },
+    { name = "psutil", marker = "extra == 'server'", specifier = ">=5.9.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pydantic", marker = "extra == 'core'", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
     { name = "python-dateutil", specifier = ">=2.8.0" },
+    { name = "python-dateutil", marker = "extra == 'all'", specifier = ">=2.8.0" },
+    { name = "python-dateutil", marker = "extra == 'cli'", specifier = ">=2.8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "pyyaml", marker = "extra == 'core'", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "structlog", specifier = ">=23.0.0" },
+    { name = "structlog", marker = "extra == 'core'", specifier = ">=23.0.0" },
+    { name = "types-psutil", marker = "extra == 'dev'", specifier = ">=7.0.0.20250801" },
+    { name = "types-python-dateutil", marker = "extra == 'dev'", specifier = ">=2.9.0.20250809" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'all'", specifier = ">=0.24.0" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.24.0" },
     { name = "watchfiles", specifier = ">=0.20.0" },
+    { name = "watchfiles", marker = "extra == 'all'", specifier = ">=0.20.0" },
+    { name = "watchfiles", marker = "extra == 'server'", specifier = ">=0.20.0" },
     { name = "websockets", marker = "extra == 'demo'", specifier = ">=12.0" },
 ]
-provides-extras = ["demo", "dev"]
+provides-extras = ["core", "server", "cli", "all", "demo", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

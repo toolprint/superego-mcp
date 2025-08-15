@@ -12,13 +12,33 @@ license = { text = "MIT" }
 authors = [
     { name = "Superego MCP Team" },
 ]
+keywords = [
+    "ai",
+    "mcp",
+    "security", 
+    "tool-filtering",
+    "claude-code",
+    "hooks",
+    "agent-safety",
+    "llm-safety",
+    "inference-control",
+    "rule-engine",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Monitoring",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Environment :: Console",
+    "Typing :: Typed",
 ]
 dependencies = [
     "fastmcp>=2.0.0",           # MCP server framework with sampling support
@@ -39,28 +59,82 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Core dependencies for evaluation mode only
+core = [
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "structlog>=23.0.0",
+    "jsonpath-ng>=1.6.0",
+]
+
+# Full server dependencies
+server = [
+    "fastmcp>=2.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "watchfiles>=0.20.0",
+    "psutil>=5.9.0",
+    "prometheus-client>=0.19.0",
+    "aiohttp>=3.9.0",
+    "aiohttp-sse>=2.1.0",
+]
+
+# CLI and development tools
+cli = [
+    "httpx>=0.25.0",
+    "python-dateutil>=2.8.0",
+]
+
+# All features
+all = [
+    "fastmcp>=2.0.0",
+    "fastapi>=0.104.0", 
+    "uvicorn[standard]>=0.24.0",
+    "watchfiles>=0.20.0",
+    "psutil>=5.9.0",
+    "prometheus-client>=0.19.0",
+    "aiohttp>=3.9.0",
+    "aiohttp-sse>=2.1.0",
+    "httpx>=0.25.0",
+    "python-dateutil>=2.8.0",
+]
+
+# Demo and testing
 demo = [
     "fast-agent-mcp>=0.1.0",    # Demo client for sampling testing
     "websockets>=12.0",         # WebSocket client for multi-transport demo
 ]
+
+# Development dependencies
 dev = [
     "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
+    "pytest-asyncio>=0.21.0", 
     "pytest-cov>=4.1.0",
     "pytest-timeout>=2.1.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "types-PyYAML>=6.0.0",
+    "types-psutil>=7.0.0.20250801",
+    "types-python-dateutil>=2.9.0.20250809",
 ]
 
 [project.scripts]
+# Unified CLI interface (primary)
+superego = "superego_mcp.cli:main"
+
+# Legacy entry points (maintained for backward compatibility)
 superego-mcp = "superego_mcp.main:cli_main"
 superego-eval = "superego_mcp.cli_eval:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/superego-mcp"
-Repository = "https://github.com/your-org/superego-mcp"
-Issues = "https://github.com/your-org/superego-mcp/issues"
+Homepage = "https://github.com/toolprint/superego-mcp"
+Repository = "https://github.com/toolprint/superego-mcp"
+Issues = "https://github.com/toolprint/superego-mcp/issues"
+Documentation = "https://github.com/toolprint/superego-mcp/blob/main/README.md"
+Changelog = "https://github.com/toolprint/superego-mcp/releases"
+"Source Code" = "https://github.com/toolprint/superego-mcp"
+"Bug Reports" = "https://github.com/toolprint/superego-mcp/issues"
+"Feature Requests" = "https://github.com/toolprint/superego-mcp/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/superego_mcp"]

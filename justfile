@@ -19,7 +19,17 @@ install:
 # Run the server
 run:
     @echo "Starting Superego MCP Server..."
+    uv run superego mcp
+
+# Run the server (legacy entry point)
+run-legacy:
+    @echo "Starting Superego MCP Server (legacy)..."
     uv run superego-mcp
+
+# Test CLI evaluation
+test-advise:
+    @echo "Testing CLI evaluation..."
+    @echo '{"tool_name": "ls", "tool_input": {"directory": "/tmp"}, "session_id": "test", "transcript_path": "", "cwd": "/tmp", "hook_event_name": "PreToolUse"}' | uv run superego advise
 
 # Run tests
 test:
@@ -75,6 +85,138 @@ build: clean
     @echo "Building package..."
     uv build
 
+# Build and test package installation
+build-test: build
+    @echo "Testing package installation..."
+    # Test wheel installation
+    @echo "Installing wheel to temporary environment..."
+    python -m venv /tmp/superego-test-env
+    /tmp/superego-test-env/bin/pip install dist/*.whl
+    @echo "Testing CLI installation..."
+    /tmp/superego-test-env/bin/superego --version
+    /tmp/superego-test-env/bin/superego --help
+    @echo "Cleaning up test environment..."
+    rm -rf /tmp/superego-test-env
+    @echo "Package installation test completed!"
+
+# Test installation with various methods
+test-install: build
+    @echo "Testing installation methods..."
+    @echo "Testing uvx installation..."
+    uvx --from ./dist/*.whl superego --version
+    @echo "Testing uv run installation..."
+    uv run --from ./dist/*.whl superego --version
+    @echo "All installation methods tested successfully!"
+
+# Prepare release
+prepare-release:
+    @echo "Preparing release..."
+    @echo "Running all quality checks..."
+    just check
+    @echo "Building package..."
+    just build
+    @echo "Testing installation..."
+    just build-test
+    @echo "Release preparation completed!"
+
+# Generate release notes
+release-notes version:
+    @echo "Generating release notes for version {{version}}..."
+    @echo "# Release {{version}}" > RELEASE_NOTES.md
+    @echo "" >> RELEASE_NOTES.md
+    @echo "## Changes" >> RELEASE_NOTES.md
+    @echo "" >> RELEASE_NOTES.md
+    git log --oneline --grep="^(feat|fix|docs|style|refactor|test|chore)" --since="$(git describe --tags --abbrev=0)..HEAD" >> RELEASE_NOTES.md
+    @echo "Release notes generated in RELEASE_NOTES.md"
+
+# Create homebrew formula
+homebrew-formula: build
+    @echo "Generating Homebrew formula..."
+    @echo "class Superego < Formula" > superego.rb
+    @echo "  desc \"Intelligent tool request interception for AI agents\"" >> superego.rb
+    @echo "  homepage \"https://github.com/toolprint/superego-mcp\"" >> superego.rb
+    @echo "  url \"https://files.pythonhosted.org/packages/source/s/superego-mcp/superego-mcp-0.1.0.tar.gz\"" >> superego.rb
+    @echo "  sha256 \"$(sha256sum dist/*.tar.gz | cut -d' ' -f1)\"" >> superego.rb
+    @echo "  license \"MIT\"" >> superego.rb
+    @echo "" >> superego.rb
+    @echo "  depends_on \"python@3.11\"" >> superego.rb
+    @echo "" >> superego.rb
+    @echo "  def install" >> superego.rb
+    @echo "    virtualenv_install_with_resources" >> superego.rb
+    @echo "  end" >> superego.rb
+    @echo "" >> superego.rb
+    @echo "  test do" >> superego.rb
+    @echo "    system bin/\"superego\", \"--version\"" >> superego.rb
+    @echo "  end" >> superego.rb
+    @echo "end" >> superego.rb
+    @echo "Homebrew formula generated: superego.rb"
+
+# Install local development build with pipx
+install-dev: build
+    @echo "Installing local development build with pipx..."
+    @if command -v pipx >/dev/null 2>&1; then \
+        echo "Checking if superego-mcp is already installed..."; \
+        if pipx list | grep -q "superego-mcp"; then \
+            echo "Uninstalling existing version..."; \
+            pipx uninstall superego-mcp; \
+        fi; \
+        echo "Installing from local wheel..."; \
+        pipx install --force ./dist/superego_mcp-0.1.0-py3-none-any.whl; \
+        echo "✓ Installed superego-mcp with pipx"; \
+        echo "Testing installation..."; \
+        superego --version; \
+        echo ""; \
+        echo "Superego is now available globally as 'superego'"; \
+        echo "Try: superego --help"; \
+    else \
+        echo "Error: pipx not found. Install with:"; \
+        echo "  brew install pipx  # macOS"; \
+        echo "  python -m pip install --user pipx  # Other systems"; \
+        exit 1; \
+    fi
+
+# Uninstall development build from pipx
+uninstall-dev:
+    @echo "Uninstalling superego-mcp from pipx..."
+    @if command -v pipx >/dev/null 2>&1; then \
+        if pipx list | grep -q "superego-mcp"; then \
+            pipx uninstall superego-mcp; \
+            echo "✓ Uninstalled superego-mcp from pipx"; \
+        else \
+            echo "superego-mcp is not installed via pipx"; \
+        fi; \
+    else \
+        echo "pipx not found - nothing to uninstall"; \
+    fi
+
+# Reinstall development build (clean install)
+reinstall-dev: uninstall-dev install-dev
+    @echo "✓ Reinstalled development build"
+
+# Show pipx installation status
+pipx-status:
+    @echo "Checking pipx installation status..."
+    @if command -v pipx >/dev/null 2>&1; then \
+        echo "pipx is installed: $(which pipx)"; \
+        echo "pipx version: $(pipx --version)"; \
+        echo ""; \
+        echo "Installed packages:"; \
+        pipx list; \
+        echo ""; \
+        if pipx list | grep -q "superego-mcp"; then \
+            echo "✓ superego-mcp is installed via pipx"; \
+            echo "Testing command:"; \
+            superego --version 2>/dev/null || echo "Command not found in PATH"; \
+        else \
+            echo "✗ superego-mcp is not installed via pipx"; \
+        fi; \
+    else \
+        echo "✗ pipx is not installed"; \
+        echo "Install with:"; \
+        echo "  brew install pipx  # macOS"; \
+        echo "  python -m pip install --user pipx  # Other systems"; \
+    fi
+
 # Demo - run legacy HTTP client demo
 demo:
     @echo "Starting demo with legacy HTTP client..."
@@ -129,6 +271,12 @@ info:
     @echo ""
     @echo "Dependencies:"
     @uv tree
+    @echo ""
+    @echo "Development Commands:"
+    @echo "  just install-dev     Install local build with pipx"
+    @echo "  just uninstall-dev   Uninstall from pipx"
+    @echo "  just reinstall-dev   Clean reinstall"
+    @echo "  just pipx-status     Show pipx installation status"
 
 # Format code
 format:

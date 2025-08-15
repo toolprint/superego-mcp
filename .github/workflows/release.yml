@@ -1,0 +1,205 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: uv sync --all-extras
+
+    - name: Run tests
+      run: |
+        uv run ruff check src/ tests/
+        uv run mypy src/
+        uv run pytest
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.11
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Build package
+      run: uv build
+
+    - name: Test package installation
+      run: |
+        python -m venv test-env
+        test-env/bin/pip install dist/*.whl
+        test-env/bin/superego --version
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+  pypi-publish:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: release
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+    - name: Extract tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        echo "# Release ${{ steps.tag.outputs.tag }}" > release_notes.md
+        echo "" >> release_notes.md
+        echo "## Installation" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### PyPI" >> release_notes.md
+        echo "\`\`\`bash" >> release_notes.md
+        echo "pip install superego-mcp" >> release_notes.md
+        echo "# or" >> release_notes.md
+        echo "uvx superego-mcp" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Usage" >> release_notes.md
+        echo "\`\`\`bash" >> release_notes.md
+        echo "# Run security evaluation" >> release_notes.md
+        echo "superego eval < hook_input.json" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "# Launch MCP server" >> release_notes.md
+        echo "superego mcp" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## Changes" >> release_notes.md
+        echo "" >> release_notes.md
+        # Get commits since last tag
+        if git describe --tags --abbrev=0 HEAD~1 &>/dev/null; then
+          git log --oneline $(git describe --tags --abbrev=0 HEAD~1)..HEAD >> release_notes.md
+        else
+          git log --oneline >> release_notes.md
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.md
+        files: |
+          dist/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  homebrew-formula:
+    runs-on: ubuntu-latest
+    needs: pypi-publish
+    if: github.ref_type == 'tag'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Extract version
+      id: version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Wait for PyPI availability
+      run: |
+        # Wait for the package to be available on PyPI
+        for i in {1..30}; do
+          if curl -s "https://pypi.org/pypi/superego-mcp/${{ steps.version.outputs.version }}/json" | grep -q '"version"'; then
+            echo "Package found on PyPI"
+            break
+          fi
+          echo "Waiting for PyPI... ($i/30)"
+          sleep 30
+        done
+
+    - name: Generate Homebrew formula
+      run: |
+        cat > superego.rb << 'EOF'
+        class Superego < Formula
+          desc "Intelligent tool request interception for AI agents"
+          homepage "https://github.com/toolprint/superego-mcp"
+          url "https://files.pythonhosted.org/packages/source/s/superego-mcp/superego-mcp-${{ steps.version.outputs.version }}.tar.gz"
+          license "MIT"
+
+          depends_on "python@3.11"
+
+          def install
+            virtualenv_install_with_resources
+          end
+
+          test do
+            system bin/"superego", "--version"
+          end
+        end
+        EOF
+
+    - name: Create Homebrew formula PR
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.HOMEBREW_TOKEN }}
+        repository: toolprint/homebrew-tap
+        branch: superego-${{ steps.version.outputs.version }}
+        commit-message: "Add superego ${{ steps.version.outputs.version }}"
+        title: "Add superego ${{ steps.version.outputs.version }}"
+        body: |
+          Automated PR to add superego ${{ steps.version.outputs.version }} to Homebrew tap.
+          
+          Generated from release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+        add-paths: |
+          superego.rb
