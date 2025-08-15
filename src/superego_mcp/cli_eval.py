@@ -135,6 +135,9 @@ class CLIEvaluator:
 
             return hook_output.model_dump(by_alias=True)
 
+        except ValueError:
+            # Re-raise ValueError for input validation errors
+            raise
         except Exception as e:
             self.logger.error(
                 "Evaluation failed", error=str(e), traceback=traceback.format_exc()

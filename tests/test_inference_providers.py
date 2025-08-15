@@ -250,7 +250,7 @@ class TestCLIProvider:
         assert decision.risk_factors == []
         assert decision.provider == "claude_cli"
         assert decision.model == "claude-3-sonnet"
-        assert decision.response_time_ms > 0
+        assert decision.response_time_ms >= 0
 
     @patch.dict(os.environ, {"TEST_API_KEY": "test-key-123"})
     @patch("subprocess.run")

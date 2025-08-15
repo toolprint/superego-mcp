@@ -120,7 +120,7 @@ rules:
         # Verify decision
         assert decision.action == "allow"
         assert decision.confidence == 0.8
-        assert decision.reasoning == "Test tool is safe to execute"
+        assert decision.reason == "Test tool is safe to execute"
         assert decision.rule_id == "test-sampling-rule"
         assert decision.ai_provider == "mcp_claude"
         assert decision.ai_model == "claude-3-sonnet"
@@ -162,7 +162,7 @@ rules:
         # Verify decision uses legacy system
         assert decision.action == "deny"
         assert decision.confidence == 0.9
-        assert decision.reasoning == "Test tool has security risks"
+        assert decision.reason == "Test tool has security risks"
         assert decision.rule_id == "test-sampling-rule"
         assert decision.ai_provider == "claude"  # Legacy format
         assert decision.ai_model == "claude-3-sonnet"
@@ -352,7 +352,7 @@ rules:
 
         assert decision.action == "allow"
         assert decision.confidence == 0.7
-        assert decision.reasoning == "Backward compatibility test"
+        assert decision.reason == "Backward compatibility test"
         assert decision.ai_provider == "claude"  # Legacy format
 
 

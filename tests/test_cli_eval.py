@@ -77,18 +77,14 @@ class TestCLIEvaluator:
     async def test_evaluate_empty_input(self, evaluator):
         """Test evaluation with empty input."""
         with patch("sys.stdin", StringIO("")):
-            with pytest.raises(
-                RuntimeError, match="Evaluation failed: No input data received"
-            ):
+            with pytest.raises(ValueError, match="No input data received"):
                 await evaluator.evaluate_from_stdin()
 
     @pytest.mark.asyncio
     async def test_evaluate_invalid_json(self, evaluator):
         """Test evaluation with invalid JSON."""
         with patch("sys.stdin", StringIO("invalid json")):
-            with pytest.raises(
-                RuntimeError, match="Evaluation failed: Invalid JSON input"
-            ):
+            with pytest.raises(ValueError, match="Invalid JSON input"):
                 await evaluator.evaluate_from_stdin()
 
     @pytest.mark.asyncio
