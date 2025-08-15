@@ -136,7 +136,7 @@ class BaseDemo(ABC):
         """
         if not rules_file:
             # Use default demo rules
-            rules_file = str(Path(__file__).parent / "config" / "rules.yaml")
+            rules_file = str(Path(__file__).parent / "config" / "superego" / "rules.yaml")
         
         # Initialize based on provider type
         if self.ai_provider == "mock":
@@ -165,7 +165,7 @@ class BaseDemo(ABC):
             return engine
         except Exception as e:
             self.logger.warning(f"Failed to load rules from {rules_file}: {e}")
-            default_rules = Path(__file__).parent / "config" / "rules.yaml"
+            default_rules = Path(__file__).parent / "config" / "superego" / "rules.yaml"
             return SecurityPolicyEngine(
                 rules_file=default_rules,
                 ai_service_manager=mock_ai_service,

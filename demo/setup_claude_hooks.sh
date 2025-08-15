@@ -110,7 +110,7 @@ echo ""
 # Provide next steps
 echo "🚀 Next Steps:"
 echo "1. Start the Superego MCP server:"
-echo "   python -m superego_mcp.main --config claude-code-demo.yaml"
+echo "   python -m superego_mcp.main --config config/superego/claude-code-demo.yaml"
 echo ""
 echo "2. Test the integration:"
 echo "   claude \"List files in the current directory using filesystem MCP\""

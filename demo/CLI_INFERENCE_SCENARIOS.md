@@ -569,8 +569,8 @@ You can test these scenarios using the demo script:
 # Interactive mode
 python claude_code_demo.py --interactive
 
-# Or test specific scenarios
-python test_security_scenarios.py --scenario "file_write"
+# Or run the comprehensive demo
+python claude_code_demo.py
 ```
 
 Each scenario helps you understand how Superego MCP protects your system while enabling legitimate development work.

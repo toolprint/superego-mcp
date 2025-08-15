@@ -18,6 +18,28 @@ python demo_dashboard.py
 
 The Demo Dashboard provides an interactive menu to explore all available demos with descriptions and guided navigation.
 
+### Optional Provider Configuration
+
+While the demos work standalone, you can also configure API providers:
+
+**Anthropic Claude (Recommended)**
+```bash
+export ANTHROPIC_API_KEY="your_anthropic_key"
+```
+
+**OpenAI GPT**
+```bash
+export OPENAI_API_KEY="your_openai_key"
+# Or use the secrets file method
+cp fastagent.secrets.yaml.example fastagent.secrets.yaml
+# Edit fastagent.secrets.yaml with your API key
+```
+
+### Run Modes
+- **Interactive Selection**: Default mode with menu options
+- **Scenarios Only**: Run automated tests with `--scenarios-only`
+- **Interactive Only**: Start chat mode directly with `--interactive-only`
+
 ## 📁 Demo Architecture
 
 All demos follow a standardized architecture using the hook-based test harness:
@@ -234,9 +256,19 @@ python <demo_name>.py --rules ./config/rules.yaml
 
 ## 📚 Additional Resources
 
-- **Demo Guide**: See `DEMO_GUIDE.md` for detailed instructions
-- **Hook Documentation**: See `README_CLAUDE_CODE_HOOKS.md`
-- **Security Rules**: Check `config/rules.yaml` for examples
+### Documentation
+- **Comprehensive Guide**: This README provides complete documentation
+- **Security Rules**: Check `config/rules.yaml` for detailed rule configurations
+
+### Exploring the Demos
+- **Beginner Path**: Start with Simple FastAgent Demo
+- **Advanced Exploration**: Dive into Interactive Hook Demo
+- **Comprehensive Testing**: Use Security Scenarios Demo
+
+### Need More Help?
+- Explore individual demo scripts for specific use cases
+- Use `--help` flag with any demo for detailed options
+- Check `demo_dashboard.py` for an interactive navigation hub
 
 ## 🎓 Learning Path
 

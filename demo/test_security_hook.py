@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for the enhanced security hook v2.
+Test script for the security hook.
 
 This script tests the security hook by sending it various hook input scenarios
 and verifying the responses match expected behavior.
@@ -93,7 +93,7 @@ TEST_SCENARIOS = [
 
 def run_hook_test(scenario: Dict[str, Any]) -> Dict[str, Any]:
     """Run a single hook test scenario."""
-    hook_script = Path(__file__).parent / "hooks" / "security_hook_v2.py"
+    hook_script = Path(__file__).parent / "hooks" / "security_hook.py"
     
     if not hook_script.exists():
         raise FileNotFoundError(f"Hook script not found: {hook_script}")
@@ -168,7 +168,7 @@ def run_hook_test(scenario: Dict[str, Any]) -> Dict[str, Any]:
 
 def main():
     """Run all hook test scenarios."""
-    print("🧪 Testing Claude Code Security Hook v2")
+    print("🧪 Testing Claude Code Security Hook")
     print("=" * 60)
     
     results = []

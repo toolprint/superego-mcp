@@ -253,10 +253,10 @@ demo-setup:
     uv run --extra demo fast-agent --version || echo "FastAgent not available - install with 'uv sync --extra demo'"
     @echo "Demo setup complete!"
 
-# Demo Verify - Check demo readiness
+# Demo Verify - Check demo readiness  
 demo-verify:
-    @echo "Verifying FastAgent demo readiness..."
-    cd demo && uv run --extra demo python verify_demo.py
+    @echo "Verifying demo readiness..."
+    cd demo && python setup_verification_cli.py
 
 # Demo All - Run complete demo suite
 demo-all: demo-scenarios demo-fastagent-simple
