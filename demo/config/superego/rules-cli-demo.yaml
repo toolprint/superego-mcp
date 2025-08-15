@@ -1,0 +1,287 @@
+# Security Rules Configuration for Claude Code CLI Demo
+# This file demonstrates various rule types and how they interact with CLI-based inference
+# Rules are evaluated in priority order (lower numbers = higher priority)
+
+rules:
+  # ============================================
+  # HIGH PRIORITY EXPLICIT DENIALS (Priority 1-10)
+  # These rules immediately block dangerous operations
+  # ============================================
+  
+  - id: "block_system_damage"
+    action: deny
+    priority: 1
+    conditions:
+      # Block any command containing these dangerous patterns
+      parameters: "rm -rf /|sudo rm|chmod 777 /|dd if=/dev/zero|:(){ :|:& };:"
+    reason: "Prevents system-damaging commands"
+    metadata:
+      severity: "critical"
+      examples:
+        - "rm -rf /"
+        - "sudo rm -rf /*"
+        - ":(){ :|:& };: # Fork bomb"
+    
+  - id: "block_sensitive_files"
+    action: deny
+    priority: 2
+    conditions:
+      # Block access to sensitive system files
+      parameters: "/etc/passwd|/etc/shadow|/etc/sudoers|~/.ssh/|/root/|/var/log/auth"
+    reason: "Protects sensitive system files"
+    metadata:
+      severity: "high"
+      protected_paths:
+        - "/etc/passwd"
+        - "/etc/shadow"
+        - "~/.ssh/id_rsa"
+  
+  - id: "block_credential_theft"
+    action: deny
+    priority: 3
+    conditions:
+      # Block attempts to read credential files
+      tool_name: "read_file|cat|less|more"
+      parameters: ".env|.aws/credentials|.npmrc|.pypirc|.gitconfig|.netrc"
+    reason: "Prevents credential theft"
+    metadata:
+      severity: "high"
+      info: "Blocks reading of common credential storage files"
+
+  # ============================================
+  # MEDIUM PRIORITY ALLOWS (Priority 11-20)
+  # Safe operations that should always be permitted
+  # ============================================
+  
+  - id: "allow_safe_reads"
+    action: allow
+    priority: 11
+    conditions:
+      tool_name: "read_file|list_files|search_files|ls|find"
+      # Only in project directories
+      parameters: "^(?!.*(/etc|/sys|/proc|/root)).*$"
+    reason: "Safe file reading in project directories"
+    metadata:
+      info: "Allows reading files outside system directories"
+  
+  - id: "allow_documentation"
+    action: allow
+    priority: 12
+    conditions:
+      tool_name: "read_file|write_file"
+      parameters: "\\.(md|txt|rst|doc|pdf)$"
+    reason: "Documentation files are always safe"
+    metadata:
+      info: "Markdown, text, and documentation files"
+  
+  - id: "allow_code_files"
+    action: allow
+    priority: 13
+    conditions:
+      tool_name: "read_file|write_file|edit_file"
+      parameters: "\\.(py|js|ts|java|cpp|go|rs|rb|php)$"
+    reason: "Source code file operations"
+    metadata:
+      info: "Common programming language files"
+
+  # ============================================
+  # CLI INFERENCE RULES (Priority 21-50)
+  # Rules that explicitly use CLI-based inference
+  # ============================================
+  
+  - id: "evaluate_file_writes"
+    action: sample
+    priority: 21
+    # Explicitly use CLI inference provider
+    inference_provider: "claude_cli"
+    conditions:
+      tool_name: "write_file|create_file|save_file"
+    reason: "File write operations need security evaluation"
+    metadata:
+      inference_prompt: |
+        Evaluate this file write operation:
+        - Is the file path safe?
+        - Could this overwrite important files?
+        - Is the content potentially malicious?
+      examples:
+        - "write_file('/tmp/test.txt', 'Hello')"
+        - "write_file('/etc/hosts', 'malicious')"
+  
+  - id: "evaluate_deletions"
+    action: sample
+    priority: 22
+    inference_provider: "claude_cli"
+    conditions:
+      tool_name: "delete_file|remove_file|unlink"
+    reason: "File deletions require careful evaluation"
+    metadata:
+      inference_prompt: |
+        Assess this deletion request:
+        - Is this a temporary or generated file?
+        - Could this cause data loss?
+        - Is this part of normal cleanup?
+      risk_levels:
+        low: "Deleting temporary files"
+        high: "Deleting source code or config files"
+  
+  - id: "evaluate_network_requests"
+    action: sample
+    priority: 23
+    inference_provider: "claude_cli"
+    conditions:
+      tool_name: "fetch_url|http_request|api_call|curl|wget"
+    reason: "Network operations need security assessment"
+    metadata:
+      inference_prompt: |
+        Analyze this network request:
+        - Is the domain trusted?
+        - Could this leak sensitive data?
+        - Is this a known API endpoint?
+      considerations:
+        - "Check for localhost/internal IPs"
+        - "Verify HTTPS usage"
+        - "Check for credential leakage in URLs"
+  
+  - id: "evaluate_system_commands"
+    action: sample
+    priority: 24
+    inference_provider: "claude_cli"
+    conditions:
+      tool_name: "execute_command|run_command|shell|bash"
+    reason: "System command execution requires evaluation"
+    metadata:
+      inference_prompt: |
+        Evaluate this system command:
+        - What is the command trying to accomplish?
+        - Are there safer alternatives?
+        - Could this have unintended side effects?
+      high_risk_patterns:
+        - "Commands with sudo"
+        - "Commands that modify system settings"
+        - "Commands with wildcards in dangerous contexts"
+  
+  - id: "evaluate_code_execution"
+    action: sample
+    priority: 25
+    inference_provider: "claude_cli"
+    conditions:
+      tool_name: "eval|exec|run_code|execute_script"
+    reason: "Dynamic code execution is high risk"
+    metadata:
+      inference_prompt: |
+        Analyze this code execution request:
+        - Is the code from a trusted source?
+        - What operations does the code perform?
+        - Could this be a code injection attempt?
+      security_checks:
+        - "No system calls"
+        - "No file system modifications"
+        - "No network operations"
+
+  # ============================================
+  # COMPLEX PATTERN RULES (Priority 51-70)
+  # Rules with sophisticated pattern matching
+  # ============================================
+  
+  - id: "evaluate_path_traversal"
+    action: sample
+    priority: 51
+    inference_provider: "claude_cli"
+    conditions:
+      # Detect path traversal attempts
+      parameters: "\\.\\./|\\.\\.\\\\"
+    reason: "Path traversal attempts need evaluation"
+    metadata:
+      inference_prompt: |
+        Check for path traversal:
+        - Is this a legitimate relative path?
+        - Could this escape the project directory?
+        - What is the resolved absolute path?
+  
+  - id: "evaluate_bulk_operations"
+    action: sample
+    priority: 52
+    inference_provider: "claude_cli"
+    conditions:
+      # Operations on multiple files
+      parameters: "\\*|\\?|\\[.*\\]|{.*}"
+      tool_name: "delete_file|write_file|move_file"
+    reason: "Bulk operations need careful review"
+    metadata:
+      inference_prompt: |
+        Evaluate this bulk operation:
+        - How many files are affected?
+        - Are these generated/temporary files?
+        - Is there a risk of accidental data loss?
+
+  # ============================================
+  # LEARNING RULES (Priority 71-90)
+  # Rules designed to demonstrate inference capabilities
+  # ============================================
+  
+  - id: "learn_git_operations"
+    action: sample
+    priority: 71
+    inference_provider: "claude_cli"
+    conditions:
+      tool_name: "git"
+      parameters: "push|force|reset|clean"
+    reason: "Git operations that could lose work"
+    metadata:
+      educational: true
+      inference_prompt: |
+        Evaluate this git operation:
+        - Could this lose uncommitted work?
+        - Is this a destructive operation?
+        - Are there safer alternatives?
+      examples:
+        allow: ["git push origin main", "git reset --soft HEAD~1"]
+        deny: ["git push --force", "git clean -fdx"]
+  
+  - id: "learn_package_management"
+    action: sample
+    priority: 72
+    inference_provider: "claude_cli"
+    conditions:
+      tool_name: "npm|pip|gem|cargo|go"
+      parameters: "install|uninstall|update"
+    reason: "Package management security check"
+    metadata:
+      educational: true
+      inference_prompt: |
+        Assess this package operation:
+        - Is this a known, trusted package?
+        - Could this introduce vulnerabilities?
+        - Are we installing from official sources?
+
+  # ============================================
+  # DEFAULT FALLBACK RULES (Priority 91-100)
+  # Catch-all rules for unmatched requests
+  # ============================================
+  
+  - id: "default_unknown_evaluation"
+    action: sample
+    priority: 99
+    inference_provider: "claude_cli"
+    conditions:
+      # Matches any request not caught by other rules
+      tool_name: ".*"
+    reason: "Unknown operations require evaluation"
+    metadata:
+      inference_prompt: |
+        Evaluate this operation for security risks:
+        - What is the intent of this operation?
+        - Are there any security implications?
+        - Should this be allowed in a development environment?
+      fallback: true
+
+# Configuration metadata
+metadata:
+  version: "1.0.0"
+  description: "Claude Code CLI Demo Security Rules"
+  created: "2024-01-10"
+  notes:
+    - "Rules are evaluated in priority order (ascending)"
+    - "First matching rule wins"
+    - "CLI inference provides intelligent security evaluation"
+    - "These rules demonstrate progressive complexity"

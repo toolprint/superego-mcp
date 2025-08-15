@@ -1,0 +1,25 @@
+rules:
+- action: allow
+  conditions:
+    tool_name:
+      type: regex
+      pattern: "^(Read|LS|Grep)$"
+  id: allow_safe_reads
+  priority: 10
+  reason: Safe file reading operations
+- action: deny
+  conditions:
+    parameters:
+      type: regex
+      pattern: "sudo|rm -rf|/etc/passwd|/etc/shadow"
+  id: block_dangerous_system
+  priority: 5
+  reason: Dangerous system operations blocked
+- action: sample
+  conditions:
+    tool_name:
+      type: regex
+      pattern: "^(Write|Bash|WebFetch|Edit)$"
+  id: evaluate_complex_ops
+  priority: 15
+  reason: Complex operations require evaluation

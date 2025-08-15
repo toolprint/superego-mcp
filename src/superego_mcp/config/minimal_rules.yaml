@@ -1,0 +1,79 @@
+# Minimal Security Rules for Standalone CLI Evaluation
+# This configuration is designed for quick validation without external dependencies
+
+# Basic configuration
+version: "1.0"
+enabled: true
+default_action: "allow"
+log_level: "INFO"
+
+# Simple rule-based evaluation (no AI inference required)
+rules:
+  # File system protection rules
+  - id: "protect_system_files"
+    name: "Protect System Files"
+    description: "Prevent access to critical system files"
+    pattern:
+      tool_name: ["Read", "Write", "Edit", "Delete"]
+      parameters:
+        file_path: 
+          contains: ["/etc/passwd", "/etc/shadow", "/boot/", "/sys/", "/proc/"]
+    action: "deny"
+    reasoning: "Access to system files is not allowed"
+
+  # Dangerous command protection
+  - id: "block_dangerous_commands"
+    name: "Block Dangerous Commands"
+    description: "Block potentially destructive shell commands"
+    pattern:
+      tool_name: ["Bash", "Shell", "Execute"]
+      parameters:
+        command:
+          contains: ["rm -rf", "sudo rm", "chmod 777", "mkfs", "fdisk", "dd if="]
+    action: "deny" 
+    reasoning: "Potentially destructive command detected"
+
+  # Network security
+  - id: "suspicious_network_activity"
+    name: "Suspicious Network Activity"
+    description: "Flag suspicious network operations"
+    pattern:
+      tool_name: ["Bash", "Shell", "Execute"]
+      parameters:
+        command:
+          contains: ["nc -l", "netcat", "wget http://", "curl http://"]
+    action: "deny"
+    reasoning: "Suspicious network activity detected"
+
+  # Windows-specific protections
+  - id: "protect_windows_system"
+    name: "Protect Windows System"
+    description: "Protect Windows system directories"
+    pattern:
+      tool_name: ["Read", "Write", "Edit", "Delete"]
+      parameters:
+        file_path:
+          contains: ["C:\\Windows\\", "C:\\System32\\", "C:\\Program Files\\"]
+    action: "deny"
+    reasoning: "Access to Windows system directories is not allowed"
+
+  # Default allow rule (lowest priority)
+  - id: "default_allow"
+    name: "Default Allow"
+    description: "Allow safe operations by default"
+    pattern:
+      tool_name: ["*"]  # Matches any tool
+    action: "allow"
+    reasoning: "Operation appears safe, no dangerous patterns detected"
+    priority: 1000  # Low priority - runs last
+
+# AI inference configuration (disabled for minimal mode)
+ai_inference:
+  enabled: false  # Disable AI inference for standalone mode
+  providers: []
+
+# Logging configuration
+logging:
+  level: "WARNING"  # Minimal logging for CLI usage
+  file: null        # No log file for CLI usage
+  console: false    # No console logging for CLI usage

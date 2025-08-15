@@ -1,0 +1,145 @@
+# Example Superego MCP Server Configuration with CLI Provider
+# This demonstrates how to configure the new inference system with Claude CLI
+
+# Server settings
+host: "localhost"
+port: 8000
+debug: false
+log_level: "INFO"
+
+# Rule engine settings
+rules_file: "config/rules.yaml"
+hot_reload: true
+
+# Health check settings
+health_check_enabled: true
+health_check_interval: 30
+
+# Rate limiting (optional)
+rate_limit_enabled: false
+rate_limit_requests: 100
+
+# AI Sampling Configuration (Legacy - maintained for backward compatibility)
+ai_sampling:
+  enabled: true
+  primary_provider: "claude"
+  fallback_provider: "openai"
+  timeout_seconds: 10
+  cache_ttl_seconds: 300
+  max_concurrent_requests: 10
+  claude_model: "claude-sonnet-4-20250514"
+  openai_model: "gpt-4-turbo-preview"
+  temperature: 0.0
+
+# Inference System Configuration (New extensible system)
+inference:
+  # Default timeout for all inference requests
+  timeout_seconds: 10
+  
+  # Provider preference order (first successful wins)
+  provider_preference:
+    - "claude_cli"      # Try CLI first for faster response
+    - "mcp_sampling"    # Fallback to MCP sampling
+  
+  # CLI provider configurations
+  cli_providers:
+    - name: "claude_cli"
+      enabled: true       # Enable CLI provider
+      type: "claude"
+      command: "claude"
+      model: "claude-sonnet-4-20250514"
+      system_prompt: |
+        You are a security evaluation system for tool execution requests.
+        
+        Your role is to analyze tool requests from AI agents and determine if they should be allowed or denied based on security implications.
+        
+        Respond with valid JSON containing:
+        - decision: "allow" or "deny"
+        - confidence: float between 0.0 and 1.0
+        - reasoning: brief explanation of your decision
+        - risk_factors: array of identified security risks (can be empty)
+        
+        Security considerations:
+        1. File system access outside safe directories
+        2. Network operations to external services
+        3. System command execution
+        4. Data modification or deletion
+        5. Privilege escalation attempts
+        6. Information disclosure risks
+        
+        Example response:
+        {
+          "decision": "allow",
+          "confidence": 0.8,
+          "reasoning": "File read operation in user directory with no sensitive data exposure risk",
+          "risk_factors": []
+        }
+        
+        Example denial:
+        {
+          "decision": "deny", 
+          "confidence": 0.9,
+          "reasoning": "Attempt to access system configuration files outside user scope",
+          "risk_factors": ["unauthorized_access", "sensitive_data"]
+        }
+      api_key_env_var: "ANTHROPIC_API_KEY"
+      max_retries: 2
+      retry_delay_ms: 1000
+      timeout_seconds: 8
+  
+  # Future: Direct API provider configurations
+  api_providers: []
+
+# Multi-Transport Configuration
+transport:
+  stdio:
+    # STDIO transport is always enabled for CLI usage
+    enabled: true
+    
+  http:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8000
+    cors_origins: ["*"]
+    
+  sse:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8002
+    cors_origins: ["*"]
+    keepalive_interval: 30
+
+# Performance Optimization Configuration
+performance:
+  metrics_enabled: true
+  metrics_port: 9090
+  
+  # Request queue configuration
+  request_queue:
+    max_size: 1000
+    timeout_seconds: 30
+    ai_sampling_concurrency: 10
+    enable_backpressure: true
+    
+  # Connection pooling configuration
+  connection_pooling:
+    max_connections: 100
+    max_keepalive_connections: 20
+    keepalive_timeout: 30
+    
+  # Response caching configuration
+  caching:
+    response_cache_ttl: 300
+    pattern_cache_size: 1000
+    enable_compression: true
+    
+  # Memory optimization
+  memory:
+    object_pool_size: 100
+    intern_strings: true
+    
+  # Request batching
+  batching:
+    enabled: true
+    batch_size: 10
+    batch_timeout: 0.5

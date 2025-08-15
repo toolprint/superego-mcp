@@ -1,0 +1,173 @@
+# config/rules.yaml - Advanced Pattern Matching Examples
+rules:
+  # Legacy simple patterns (backward compatibility)
+  - id: "deny_dangerous_commands"
+    priority: 1
+    conditions:
+      tool_name: ["rm", "sudo", "chmod", "dd"]
+    action: "deny"
+    reason: "Dangerous system command blocked"
+    
+  # Regex pattern example - block destructive commands
+  - id: "block_destructive_commands"
+    priority: 2
+    conditions:
+      tool_name:
+        type: "regex"
+        pattern: "^(rm|delete|remove|destroy|kill|terminate).*"
+    action: "deny"
+    reason: "Destructive command pattern detected"
+    
+  # Glob pattern example - protect system directories
+  - id: "protect_system_files"
+    priority: 3
+    conditions:
+      parameters:
+        path:
+          type: "glob"
+          pattern: "/etc/**"
+    action: "deny"
+    reason: "System directory access denied"
+    
+  # JSONPath example - check for size parameter
+  - id: "limit_large_requests"
+    priority: 4
+    conditions:
+      parameters:
+        size:
+          type: "jsonpath"
+          pattern: "$.size"
+    action: "sample"
+    reason: "File operation with size parameter requires review"
+    sampling_guidance: "Evaluate if this file operation is legitimate and safe"
+    
+  # Composite conditions with AND logic
+  - id: "restrict_sensitive_operations"
+    priority: 5
+    conditions:
+      AND:
+        - tool_name:
+            type: "regex"
+            pattern: "^(write|edit|exec)"
+        - cwd:
+            type: "glob"
+            pattern: "/home/**/.ssh/**"
+    action: "deny"
+    reason: "Sensitive directory operations blocked"
+    
+  # Time-based restrictions with OR logic
+  - id: "business_hours_restrictions"
+    priority: 6
+    conditions:
+      AND:
+        - OR:
+            - tool_name:
+                type: "regex"
+                pattern: "^(deploy|restart|shutdown)"
+            - tool_name: ["systemctl", "service"]
+        - time_range:
+            start: "09:00"
+            end: "17:00"
+            timezone: "UTC"
+    action: "sample"
+    reason: "Administrative operations during business hours"
+    sampling_guidance: "Verify if this administrative action is authorized during business hours"
+    
+  # JSONPath example - detect network requests with URL
+  - id: "monitor_network_requests"
+    priority: 7
+    conditions:
+      AND:
+        - tool_name: ["curl", "wget", "http"]
+        - parameters:
+            url:
+              type: "regex"
+              pattern: ".*(exe|dll|bin|onion|suspicious).*"
+    action: "deny"
+    reason: "Suspicious network request blocked"
+    
+  # Multiple glob patterns with OR
+  - id: "protect_config_files"
+    priority: 8
+    conditions:
+      OR:
+        - parameters:
+            path:
+              type: "glob"
+              pattern: "**/*.conf"
+        - parameters:
+            path:
+              type: "glob" 
+              pattern: "**/*.config"
+        - parameters:
+            path:
+              type: "glob"
+              pattern: "**/config/**"
+    action: "sample"
+    reason: "Configuration file access requires review"
+    sampling_guidance: "Assess if configuration file access is legitimate and safe"
+    
+  # File operations with multiple conditions
+  - id: "sample_file_operations" 
+    priority: 10
+    conditions:
+      AND:
+        - tool_name: ["edit", "write", "delete"]
+        - parameters:
+            path:
+              type: "regex"
+              pattern: "^(?!/tmp/).*$"  # Not in temp directory
+    action: "sample"
+    reason: "File operation requires AI evaluation"
+    sampling_guidance: "Evaluate if this file operation is safe based on the file path and content. Consider: 1) Is the path in a safe directory? 2) Could this damage system files? 3) Is sensitive data at risk?"
+    
+  # Network operations with enhanced patterns
+  - id: "sample_network_operations"
+    priority: 15
+    conditions:
+      OR:
+        - tool_name:
+            type: "regex"
+            pattern: "^(curl|wget|ssh|scp|ftp|rsync)$"
+        - parameters:
+            url:
+              type: "jsonpath"
+              pattern: "$.url"
+    action: "sample"
+    reason: "Network operation requires security review"
+    sampling_guidance: "Assess network operation safety. Check for: 1) Data exfiltration attempts 2) Connection to suspicious domains 3) Credential exposure 4) Download of malicious content"
+    
+  # Code execution with pattern matching
+  - id: "sample_code_execution"
+    priority: 20
+    conditions:
+      OR:
+        - tool_name:
+            type: "regex"
+            pattern: "^(exec|eval|python|node|bash|sh|powershell)$"
+        - parameters:
+            command:
+              type: "regex"
+              pattern: ".*(eval|exec|system|shell|cmd).*"
+    action: "sample"
+    reason: "Code execution requires careful evaluation"
+    sampling_guidance: "Analyze code execution request for: 1) Malicious code patterns 2) System compromise attempts 3) Resource abuse 4) Privilege escalation. Default to deny if uncertain."
+    
+  # Disabled rule example
+  - id: "legacy_rule_disabled"
+    priority: 90
+    enabled: false
+    conditions:
+      tool_name: ["old_command"]
+    action: "deny"
+    reason: "Legacy rule - disabled"
+    
+  # Safe commands (highest priority number = lowest priority)
+  - id: "allow_safe_commands"
+    priority: 99
+    conditions:
+      tool_name:
+        type: "regex"
+        pattern: "^(read|ls|grep|find|cat|head|tail|less|more)$"
+    action: "allow"
+    reason: "Safe read-only command"
