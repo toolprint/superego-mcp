@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "superego-mcp"
 version = "0.0.0"
-description = "Intelligent tool-call approvals for AI agents"
+description = "Intelligent tool-call review system for AI agents"
 requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "MIT" }
