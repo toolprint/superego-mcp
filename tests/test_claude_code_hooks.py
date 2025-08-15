@@ -166,13 +166,15 @@ class TestClaudeCodeModels:
         """Test the create_hook_output utility function."""
         output = create_hook_output(
             event_type=HookEventName.PRE_TOOL_USE,
-            permission=PermissionDecision.ALLOW,
-            message="Tool allowed",
+            permission_decision=PermissionDecision.ALLOW,
+            permission_decision_reason="Tool allowed",
         )
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.ALLOW
-        assert output.message == "Tool allowed"
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.ALLOW
+        )
+        assert output.hook_specific_output.permission_decision_reason == "Tool allowed"
 
 
 class TestHookIntegrationService:
@@ -255,10 +257,11 @@ class TestHookIntegrationService:
         )
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.ALLOW
-        assert output.continue_ is True
-        assert output.stop_reason is None
-        assert "Safe operation detected" in output.message
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.ALLOW
+        )
+        assert output.decision == "approve"
+        assert "Safe operation detected" in output.reason
 
     def test_convert_decision_to_hook_output_deny(self):
         """Test converting DENY decision to hook output."""
@@ -275,11 +278,12 @@ class TestHookIntegrationService:
         )
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.DENY
-        assert output.continue_ is False
-        assert output.stop_reason == StopReason.SECURITY_VIOLATION
-        assert "Dangerous file operation" in output.message
-        assert "rule-001" in output.message
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.DENY
+        )
+        assert output.decision == "block"
+        assert "Dangerous file operation" in output.reason
+        assert "rule-001" in output.reason
 
     def test_convert_decision_to_hook_output_sample(self):
         """Test converting SAMPLE decision to hook output."""
@@ -295,9 +299,10 @@ class TestHookIntegrationService:
         )
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.ASK
-        assert output.continue_ is True  # Sample allows execution with approval
-        assert output.stop_reason is None
+        assert output.hook_specific_output.permission_decision == PermissionDecision.ASK
+        assert (
+            output.decision == "approve"
+        )  # Sample maps to approve for Claude Code compatibility
 
     def test_convert_decision_post_tool_use(self):
         """Test converting decision for PostToolUse event."""
@@ -330,10 +335,10 @@ class TestHookIntegrationService:
         )
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.DENY
-        assert output.continue_ is False
-        assert output.stop_reason == StopReason.ERROR
-        assert output.suppress_output is True
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.DENY
+        )
+        assert output.decision == "block"
 
     def test_create_error_output_fail_open(self):
         """Test creating error output with fail-open behavior."""
@@ -344,10 +349,10 @@ class TestHookIntegrationService:
         )
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.ALLOW
-        assert output.continue_ is True
-        assert output.stop_reason is None
-        assert output.suppress_output is False
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.ALLOW
+        )
+        assert output.decision == "approve"
 
     def test_should_evaluate_request_tool_events(self):
         """Test should_evaluate_request for tool events."""
@@ -472,7 +477,9 @@ class TestConvenienceFunctions:
         output = create_decision_output(decision, HookEventName.PRE_TOOL_USE)
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.ALLOW
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.ALLOW
+        )
 
 
 class TestIntegrationScenarios:
@@ -516,9 +523,11 @@ class TestIntegrationScenarios:
         )
 
         assert isinstance(output, PreToolUseOutput)
-        assert output.permission == PermissionDecision.DENY
-        assert output.continue_ is False
-        assert "system file" in output.message.lower()
+        assert (
+            output.hook_specific_output.permission_decision == PermissionDecision.DENY
+        )
+        assert output.decision == "block"
+        assert "system file" in output.reason.lower()
 
     def test_post_tool_use_flow_with_blocking(self):
         """Test PostToolUse flow with output blocking."""
@@ -571,8 +580,11 @@ class TestIntegrationScenarios:
         )
 
         assert isinstance(error_output, PreToolUseOutput)
-        assert error_output.permission == PermissionDecision.DENY
-        assert error_output.continue_ is False
+        assert (
+            error_output.hook_specific_output.permission_decision
+            == PermissionDecision.DENY
+        )
+        assert error_output.decision == "block"
 
 
 if __name__ == "__main__":

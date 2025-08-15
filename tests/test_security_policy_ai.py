@@ -280,7 +280,10 @@ class TestSecurityPolicyWithAI:
         decision = await engine.evaluate(request)
 
         assert decision.action == "deny"
-        assert "AI service not configured" in decision.reason
+        assert (
+            "Rule rule-ai-sample requires inference but no providers configured"
+            in decision.reason
+        )
 
     @pytest.mark.asyncio
     async def test_regular_rules_bypass_ai(

@@ -336,7 +336,10 @@ class TestSecurityPolicyEngine:
             # When no AI service is configured, sampling should deny for security
             assert decision.action == "deny"
             assert decision.rule_id == "sample_rule"
-            assert "AI service not configured" in decision.reason
+            assert (
+                "Rule sample_rule requires inference but no providers configured"
+                in decision.reason
+            )
             assert decision.confidence == 0.6
         finally:
             rules_file.unlink()

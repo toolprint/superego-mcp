@@ -46,6 +46,8 @@ rules:
             "enabled": True,
             "services_initialized": ["claude"],
         }
+        # Create mock config object
+        manager.config = MagicMock()
         manager.config.claude_model = "claude-3-sonnet"
         return manager
 

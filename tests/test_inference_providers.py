@@ -220,21 +220,25 @@ class TestCLIProvider:
         # Mock CLI execution
         mock_proc = MagicMock()
         mock_proc.returncode = 0
-        mock_proc.communicate.return_value = (
-            json.dumps(
-                {
-                    "content": json.dumps(
-                        {
-                            "decision": "allow",
-                            "confidence": 0.8,
-                            "reasoning": "File read is safe",
-                            "risk_factors": [],
-                        }
-                    )
-                }
-            ).encode(),
-            b"",
-        )
+
+        async def mock_communicate(input=None):
+            return (
+                json.dumps(
+                    {
+                        "content": json.dumps(
+                            {
+                                "decision": "allow",
+                                "confidence": 0.8,
+                                "reasoning": "File read is safe",
+                                "risk_factors": [],
+                            }
+                        )
+                    }
+                ).encode(),
+                b"",
+            )
+
+        mock_proc.communicate = mock_communicate
         mock_subprocess_exec.return_value = mock_proc
 
         provider = CLIProvider(cli_config)
@@ -285,7 +289,11 @@ class TestCLIProvider:
         # Mock CLI error
         mock_proc = MagicMock()
         mock_proc.returncode = 1
-        mock_proc.communicate.return_value = (b"", b"CLI error occurred")
+
+        async def mock_communicate_error(input=None):
+            return (b"", b"CLI error occurred")
+
+        mock_proc.communicate = mock_communicate_error
         mock_subprocess_exec.return_value = mock_proc
 
         provider = CLIProvider(cli_config)
@@ -347,7 +355,7 @@ class TestCLIProvider:
         health = await provider.health_check()
 
         assert health.healthy is True
-        assert "CLI available and configured" in health.message
+        assert "CLI available" in health.message
 
     @patch.dict(os.environ, {})  # No API key
     @patch("subprocess.run")
@@ -361,8 +369,8 @@ class TestCLIProvider:
 
         health = await provider.health_check()
 
-        assert health.healthy is False
-        assert "API key not found" in health.message
+        assert health.healthy is True
+        assert "OAuth/CLI auth" in health.message
 
     @patch("subprocess.run")
     def test_cli_provider_get_provider_info(self, mock_subprocess, cli_config):
@@ -392,6 +400,8 @@ class TestMCPSamplingProvider:
             "services_initialized": ["claude", "openai"],
             "circuit_breaker_state": "closed",
         }
+        # Create mock config object
+        manager.config = MagicMock()
         manager.config.claude_model = "claude-3-sonnet"
         manager.config.openai_model = "gpt-4"
         return manager
@@ -587,6 +597,8 @@ class TestInferenceStrategyManager:
             "enabled": True,
             "services_initialized": ["claude"],
         }
+        # Create mock config object
+        manager.config = MagicMock()
         manager.config.claude_model = "claude-3-sonnet"
         return manager
 
@@ -784,7 +796,7 @@ class TestInferenceConfig:
         """Test default inference configuration."""
         config = InferenceConfig()
 
-        assert config.timeout_seconds == 10
+        assert config.timeout_seconds == 30
         assert config.provider_preference == ["mcp_sampling"]
         assert config.cli_providers == []
         assert config.api_providers == []
