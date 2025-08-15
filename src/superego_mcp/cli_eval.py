@@ -15,23 +15,26 @@ Exit Codes:
     2: Blocking error (stderr fed back to Claude)
 """
 
+import asyncio
 import json
 import sys
-import asyncio
 import traceback
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 
-from .domain.claude_code_models import PreToolUseInput, PreToolUseOutput, PreToolUseHookSpecificOutput, PermissionDecision
+from .domain.claude_code_models import (
+    PreToolUseHookSpecificOutput,
+    PreToolUseOutput,
+)
 from .domain.hook_integration import HookIntegrationService
-from .domain.models import ToolRequest, Decision, ToolAction, SecurityRule
+from .domain.models import ToolRequest
 from .infrastructure.inference import (
-    MockInferenceProvider,
-    InferenceRequest,
     InferenceConfig,
+    InferenceRequest,
     InferenceStrategyManager,
+    MockInferenceProvider,
 )
 from .infrastructure.logging_config import configure_stderr_logging
 
@@ -49,7 +52,7 @@ class CLIEvaluator:
         """Set up the mock inference provider for standalone evaluation."""
         # Create mock inference provider
         self.mock_provider = MockInferenceProvider()
-        
+
         # Create minimal inference config that uses the mock provider
         self.inference_config = InferenceConfig(
             timeout_seconds=5,  # Quick timeout for CLI usage
@@ -57,28 +60,28 @@ class CLIEvaluator:
             cli_providers=[],  # No CLI providers needed
             api_providers=[]   # No API providers needed
         )
-        
+
         # Create dependencies for inference manager
         dependencies = {
             "ai_service_manager": None,  # Not needed for mock provider
             "prompt_builder": None       # Not needed for mock provider
         }
-        
+
         # Create inference manager
         self.inference_manager = InferenceStrategyManager(
-            self.inference_config, 
+            self.inference_config,
             dependencies
         )
-        
+
         # Manually add the mock provider since we're not using the standard initialization
         self.inference_manager.providers["mock_inference"] = self.mock_provider
 
-    async def evaluate_from_stdin(self) -> Dict[str, Any]:
+    async def evaluate_from_stdin(self) -> dict[str, Any]:
         """Read hook input from stdin and return decision.
-        
+
         Returns:
             Dictionary containing the hook output JSON in Claude Code format
-            
+
         Raises:
             ValueError: If input is invalid
             RuntimeError: If evaluation fails
@@ -97,12 +100,12 @@ class CLIEvaluator:
 
             # Extract fields from raw input (Claude Code format)
             session_id = hook_input_raw.get("session_id", "cli_eval_session")
-            transcript_path = hook_input_raw.get("transcript_path", "")
+            hook_input_raw.get("transcript_path", "")
             cwd = hook_input_raw.get("cwd", str(Path.cwd()))
-            hook_event_name = hook_input_raw.get("hook_event_name", "PreToolUse")
+            hook_input_raw.get("hook_event_name", "PreToolUse")
             tool_name = hook_input_raw.get("tool_name")
             tool_input = hook_input_raw.get("tool_input", {})
-            
+
             if not tool_name:
                 raise ValueError("tool_name is required")
 
@@ -129,7 +132,7 @@ class CLIEvaluator:
 
             # Convert to Claude Code hook output format
             hook_output = self._convert_decision_to_hook_output(decision)
-            
+
             return hook_output.model_dump(by_alias=True)
 
         except Exception as e:
@@ -139,10 +142,10 @@ class CLIEvaluator:
 
     def _convert_decision_to_hook_output(self, decision: Any) -> PreToolUseOutput:
         """Convert inference decision to Claude Code hook output.
-        
+
         Args:
             decision: InferenceDecision from provider
-            
+
         Returns:
             PreToolUseOutput formatted for Claude Code
         """
@@ -155,14 +158,14 @@ class CLIEvaluator:
 
         # Convert to PermissionDecision enum
         if decision_str == "allow":
-            permission = PermissionDecision.ALLOW
+            pass
         elif decision_str == "ask":
-            permission = PermissionDecision.ASK
+            pass
         else:
-            permission = PermissionDecision.DENY  # Safe default
+            pass  # Safe default
 
         # Get reasoning
-        reasoning = getattr(decision, 'reasoning', 
+        reasoning = getattr(decision, 'reasoning',
                           f"Security evaluation completed (provider: {getattr(decision, 'provider', 'unknown')})")
 
         # Create hook-specific output
@@ -171,13 +174,13 @@ class CLIEvaluator:
             permission_decision=decision_str,
             permission_decision_reason=reasoning
         )
-        
+
         return PreToolUseOutput(
             hook_specific_output=hook_specific_output,
             decision="approve" if decision_str == "allow" else "block",
             reason=reasoning
         )
-    
+
 
 
 def main():
@@ -194,7 +197,7 @@ def main():
 
         # Output result as JSON to stdout
         print(json.dumps(result, separators=(',', ':')))
-        
+
         # Exit with success
         sys.exit(0)
 
@@ -202,12 +205,12 @@ def main():
         # Input validation error - non-blocking error
         print(f"Input error: {e}", file=sys.stderr)
         sys.exit(1)
-        
+
     except RuntimeError as e:
         # Evaluation error - blocking error (Claude should stop)
         print(f"Evaluation error: {e}", file=sys.stderr)
         sys.exit(2)
-        
+
     except Exception as e:
         # Unexpected error - blocking error
         print(f"Unexpected error: {e}", file=sys.stderr)
@@ -216,3 +219,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

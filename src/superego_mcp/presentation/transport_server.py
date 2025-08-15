@@ -240,7 +240,7 @@ class MultiTransportServer:
             # Handle CLI transport override
             if self.cli_transport:
                 logger.info(f"CLI transport override: {self.cli_transport}")
-                
+
                 if self.cli_transport == "stdio":
                     # Start only STDIO transport
                     if not self._is_test_environment():
@@ -249,25 +249,25 @@ class MultiTransportServer:
                         logger.info("STDIO transport started (CLI override)")
                     else:
                         logger.info("STDIO transport skipped in test environment")
-                        
+
                 elif self.cli_transport == "http":
                     # Start only HTTP transport with CLI port override
                     port = self.cli_port or 8000
                     host = "localhost"
-                    
+
                     # Use config values if available, otherwise defaults
                     if hasattr(self.config, "transport") and hasattr(self.config.transport, "http"):
                         host = self.config.transport.http.host
                         if not self.cli_port:  # Only use config port if CLI didn't override
                             port = self.config.transport.http.port
-                    
+
                     # Create HTTP config with CLI overrides
                     http_config = {
                         "host": host,
                         "port": port,
                         "enabled": True,
                     }
-                    
+
                     self.http_transport = HTTPTransport(
                         mcp=self.mcp,
                         security_policy=self.security_policy,
@@ -284,7 +284,7 @@ class MultiTransportServer:
                         host=host,
                         port=port,
                     )
-                    
+
             else:
                 # Normal config-based startup
                 # Get transport configuration
@@ -368,7 +368,7 @@ class MultiTransportServer:
             # Create a dedicated ThreadPoolExecutor for STDIO transport
             # This allows us to properly shut it down during cleanup
             self._stdio_executor = ThreadPoolExecutor(
-                max_workers=1, 
+                max_workers=1,
                 thread_name_prefix="stdio-transport"
             )
 
@@ -378,7 +378,7 @@ class MultiTransportServer:
             try:
                 await asyncio.wait_for(
                     loop.run_in_executor(
-                        self._stdio_executor, 
+                        self._stdio_executor,
                         lambda: self.mcp.run(transport="stdio")
                     ),
                     timeout=None,  # STDIO should run indefinitely in production
@@ -444,10 +444,10 @@ class MultiTransportServer:
                 try:
                     # Try graceful shutdown first with a very short timeout
                     self._stdio_executor.shutdown(wait=False)
-                    
+
                     # Give it a moment to shutdown gracefully
                     await asyncio.sleep(0.1)
-                    
+
                     # If that doesn't work, we'll rely on the signal handler to force exit
                     logger.info("STDIO executor shutdown initiated")
                 except Exception as e:

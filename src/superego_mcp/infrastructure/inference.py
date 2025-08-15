@@ -189,7 +189,7 @@ class CLIProvider(InferenceProvider):
 
         # Sanitize and build CLI command
         cmd, prompt_text = self._build_cli_command(request)
-        
+
         # Debug: Log the CLI command being executed
         self.logger.info(
             "Executing CLI command",
@@ -226,17 +226,17 @@ class CLIProvider(InferenceProvider):
 
                 # Parse JSON response
                 response_text = stdout.decode("utf-8", errors="ignore")
-                
+
                 # Debug: Log the raw CLI response
                 self.logger.info(
                     "Raw CLI response",
                     response_length=len(response_text),
                     response_preview=response_text[:500] if response_text else "(empty)",
                 )
-                
+
                 if not response_text.strip():
                     raise RuntimeError("CLI returned empty response (possible timeout or execution failure)")
-                    
+
                 response = self._parse_json_response(response_text)
                 response_time_ms = int((time.perf_counter() - start_time) * 1000)
 
@@ -298,7 +298,7 @@ class CLIProvider(InferenceProvider):
 
         # Create simplified prompt for better CLI compatibility
         simple_prompt = f"Should this operation be allowed? {sanitized_prompt[:500]}... Reply with JSON containing 'decision' (allow/deny), 'reasoning', and 'confidence' (0.0-1.0)."
-        
+
         # Build streaming JSON command
         cmd = [
             self.config.command,
@@ -323,7 +323,7 @@ class CLIProvider(InferenceProvider):
         json_message = {
             "type": "user",
             "message": {
-                "role": "user", 
+                "role": "user",
                 "content": [
                     {
                         "type": "text",
@@ -422,17 +422,17 @@ class CLIProvider(InferenceProvider):
         """
         try:
             response_text = response_text.strip()
-            
+
             # Streaming JSON format returns multiple JSON objects, one per line
             # We want the final "result" object
             lines = response_text.split('\n')
             result_obj = None
-            
+
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
-                    
+
                 try:
                     json_obj = json.loads(line)
                     # Look for the final result object
@@ -444,10 +444,10 @@ class CLIProvider(InferenceProvider):
                         result_obj = json_obj
                 except json.JSONDecodeError:
                     continue
-            
+
             if result_obj:
                 return result_obj
-            
+
             # Fallback: try to parse as single JSON object
             return json.loads(response_text)
 
@@ -474,7 +474,7 @@ class CLIProvider(InferenceProvider):
         # Claude CLI with --output-format stream-json returns different format
         # Look for content in message structure or fallback to result field
         content = ""
-        
+
         if "message" in response and "content" in response["message"]:
             # Extract text content from message content array
             message_content = response["message"]["content"]
@@ -602,7 +602,7 @@ class CLIProvider(InferenceProvider):
                 # CLI is available - it could be using OAuth or API key
                 api_key = os.getenv(self.config.api_key_env_var) if self.config.api_key_env_var else None
                 auth_method = "API key" if api_key else "OAuth/CLI auth"
-                
+
                 return HealthStatus(
                     healthy=True,
                     message=f"{self.config.command} CLI available ({auth_method})",
@@ -773,7 +773,7 @@ class MCPSamplingProvider(InferenceProvider):
 
 class MockInferenceProvider(InferenceProvider):
     """Mock inference provider for testing and standalone evaluation.
-    
+
     This provider implements simple rule-based evaluation without requiring
     external AI services. It's designed for quick validation and testing
     scenarios where deterministic behavior is desired.
@@ -787,11 +787,11 @@ class MockInferenceProvider(InferenceProvider):
         """
         self.config = config or {}
         self.logger = structlog.get_logger(__name__)
-        
+
         # Configurable dangerous patterns
         self.dangerous_patterns = self.config.get("dangerous_patterns", [
             "rm -rf",
-            "/etc/passwd", 
+            "/etc/passwd",
             "/etc/shadow",
             "sudo rm",
             "chmod 777",
@@ -807,7 +807,7 @@ class MockInferenceProvider(InferenceProvider):
             "del /s",
             "rmdir /s"
         ])
-        
+
         # Configurable system paths to protect
         self.protected_paths = self.config.get("protected_paths", [
             "/etc/",
@@ -830,26 +830,26 @@ class MockInferenceProvider(InferenceProvider):
             InferenceDecision with deterministic evaluation results
         """
         start_time = time.perf_counter()
-        
+
         # Convert request to searchable text
         search_text = self._extract_searchable_text(request)
-        
+
         # Check for dangerous patterns
         danger_found = None
         for pattern in self.dangerous_patterns:
             if pattern.lower() in search_text.lower():
                 danger_found = pattern
                 break
-        
+
         # Check for protected paths
         protected_path_found = None
         for path in self.protected_paths:
             if path.lower() in search_text.lower():
                 protected_path_found = path
                 break
-        
+
         response_time_ms = int((time.perf_counter() - start_time) * 1000)
-        
+
         if danger_found:
             return InferenceDecision(
                 decision="deny",
@@ -862,7 +862,7 @@ class MockInferenceProvider(InferenceProvider):
             )
         elif protected_path_found:
             return InferenceDecision(
-                decision="deny", 
+                decision="deny",
                 confidence=0.8,
                 reasoning=f"Access to protected path '{protected_path_found}' is not allowed",
                 risk_factors=["protected_path_access", "system_modification"],
@@ -876,17 +876,17 @@ class MockInferenceProvider(InferenceProvider):
                 confidence=0.7,
                 reasoning="No dangerous patterns detected, operation appears safe",
                 risk_factors=[],
-                provider="mock_inference", 
+                provider="mock_inference",
                 model="pattern-matcher-v1",
                 response_time_ms=response_time_ms,
             )
 
     def _extract_searchable_text(self, request: InferenceRequest) -> str:
         """Extract text from request for pattern matching.
-        
+
         Args:
             request: The inference request
-            
+
         Returns:
             Combined text for searching
         """
@@ -895,7 +895,7 @@ class MockInferenceProvider(InferenceProvider):
             request.tool_request.tool_name,
             str(request.tool_request.parameters)
         ]
-        
+
         return " ".join(str(part) for part in text_parts if part)
 
     def get_provider_info(self) -> ProviderInfo:
@@ -933,7 +933,7 @@ class MockInferenceProvider(InferenceProvider):
     async def initialize(self) -> None:
         """Initialize mock provider resources."""
         # Mock provider needs no initialization
-        self.logger.info("Mock inference provider initialized", 
+        self.logger.info("Mock inference provider initialized",
                         patterns=len(self.dangerous_patterns),
                         protected_paths=len(self.protected_paths))
 

@@ -13,9 +13,9 @@ from src.superego_mcp.domain.claude_code_models import (
     PermissionDecision,
     PostToolUseInput,
     PostToolUseOutput,
+    PreToolUseHookSpecificOutput,
     PreToolUseInput,
     PreToolUseOutput,
-    PreToolUseHookSpecificOutput,
     StopReason,
     ToolInputData,
     create_hook_output,
@@ -99,7 +99,7 @@ class TestClaudeCodeModels:
             permissionDecision=PermissionDecision.DENY,
             permissionDecisionReason="File access denied"
         )
-        
+
         output = PreToolUseOutput(
             hookSpecificOutput=hook_specific_output,
             decision="block",

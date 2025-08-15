@@ -8,12 +8,12 @@ import structlog
 
 
 def configure_logging(
-    level: str = "INFO", 
-    json_logs: bool = True, 
+    level: str = "INFO",
+    json_logs: bool = True,
     stream: TextIO = sys.stdout
 ) -> None:
     """Configure structured logging for the application.
-    
+
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         json_logs: Whether to use JSON formatting (True) or human-readable (False)
@@ -67,10 +67,10 @@ def configure_logging(
 
 def configure_stderr_logging(level: str = "WARNING", json_logs: bool = False) -> None:
     """Configure logging to stderr with sensible defaults for CLI tools.
-    
+
     This is a convenience function for CLI tools that need to output clean
     JSON or other data on stdout while keeping logs on stderr.
-    
+
     Args:
         level: Log level (default: WARNING to reduce noise)
         json_logs: Whether to use JSON formatting (default: False for CLI readability)

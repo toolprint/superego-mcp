@@ -6,7 +6,7 @@ and the Superego domain models, handling all schema conversions and validations.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from .claude_code_models import (
@@ -79,7 +79,7 @@ class HookIntegrationService:
                     session_id=hook_input.session_id,
                     agent_id=self._extract_agent_id(hook_input),
                     cwd=hook_input.cwd,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
 
             # Other event types don't map to tool requests
@@ -237,7 +237,7 @@ class HookIntegrationService:
             self.logger.error(f"Failed to create error output: {e}")
             # Ultimate fallback - return minimal error output
             from .claude_code_models import PreToolUseHookSpecificOutput
-            
+
             return PreToolUseOutput(
                 hookSpecificOutput=PreToolUseHookSpecificOutput(
                     permissionDecision=PermissionDecision.DENY,
@@ -308,7 +308,7 @@ class HookIntegrationService:
             "session_id": hook_input.session_id,
             "cwd": hook_input.cwd,
             "event_type": hook_input.hook_event_name.value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         # Add transcript path if available

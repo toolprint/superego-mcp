@@ -12,9 +12,9 @@ from .claude_code_models import (
     PermissionDecision,
     PostToolUseInput,
     PostToolUseOutput,
+    PreToolUseHookSpecificOutput,
     PreToolUseInput,
     PreToolUseOutput,
-    PreToolUseHookSpecificOutput,
     create_hook_output,
     validate_hook_input,
 )

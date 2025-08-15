@@ -15,13 +15,13 @@ from base_demo import BaseDemo
 
 class TestDemo(BaseDemo):
     """Simple test demo for real AI functionality."""
-    
+
     def run(self):
         """Run a few test scenarios."""
         print(f"\n{'='*60}")
         print(f"Testing AI Provider: {self.ai_provider}")
         print(f"{'='*60}")
-        
+
         # Test scenarios that should trigger sampling
         scenarios = [
             {
@@ -30,7 +30,7 @@ class TestDemo(BaseDemo):
                 "description": "Write a simple Python file"
             },
             {
-                "tool_name": "Bash", 
+                "tool_name": "Bash",
                 "parameters": {"command": "ls -la"},
                 "description": "List directory contents"
             },
@@ -40,32 +40,32 @@ class TestDemo(BaseDemo):
                 "description": "Edit configuration file"
             }
         ]
-        
+
         print(f"Running {len(scenarios)} test scenarios...")
         for i, scenario in enumerate(scenarios, 1):
             print(f"\n--- Test {i}/{len(scenarios)} ---")
             self.process_tool_request(
                 tool_name=scenario["tool_name"],
-                parameters=scenario["parameters"], 
+                parameters=scenario["parameters"],
                 description=scenario["description"]
             )
-        
+
         # Display results
         self.display_summary()
 
 
 def main():
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Test Real AI Provider Functionality")
     BaseDemo.add_common_arguments(parser)
     args = parser.parse_args()
-    
+
     print(f"Testing with AI provider: {args.ai_provider}")
     if args.ai_provider == "claude_cli":
         import os
         import subprocess
-        
+
         # Test Claude CLI availability
         try:
             result = subprocess.run(["claude", "-p", "test"], capture_output=True, text=True, timeout=5)
@@ -77,7 +77,7 @@ def main():
                 print("Claude CLI test failed - will fall back to mock")
         except Exception as e:
             print(f"Claude CLI not available: {e} - will fall back to mock")
-    
+
     try:
         demo = TestDemo(
             demo_name="test_real_ai",
@@ -88,7 +88,7 @@ def main():
             api_key_env=args.api_key_env
         )
         demo.run()
-        
+
     except KeyboardInterrupt:
         print("\nTest interrupted")
     except Exception as e:

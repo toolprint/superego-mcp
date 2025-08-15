@@ -6,7 +6,7 @@ based on the official documentation. These models ensure type safety and
 validation for all hook interactions.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Literal
 
@@ -182,18 +182,18 @@ HookInput = (
 
 class HookSpecificOutput(BaseModel):
     """Base model for hook-specific output data."""
-    
+
     hook_event_name: HookEventName = Field(
-        alias="hookEventName", 
+        alias="hookEventName",
         description="Type of hook event"
     )
-    
+
     model_config = {"populate_by_name": True}
 
 
 class PreToolUseHookSpecificOutput(HookSpecificOutput):
     """Hook-specific output for PreToolUse events."""
-    
+
     hook_event_name: Literal["PreToolUse"] = Field(
         default="PreToolUse",
         alias="hookEventName"
@@ -213,12 +213,12 @@ class PreToolUseHookSpecificOutput(HookSpecificOutput):
 
 class PreToolUseOutput(BaseModel):
     """Output model for PreToolUse hook responses matching Claude Code specification."""
-    
+
     hook_specific_output: PreToolUseHookSpecificOutput = Field(
         alias="hookSpecificOutput",
         description="Hook-specific output data"
     )
-    
+
     # Deprecated fields for backward compatibility
     decision: Literal["approve", "block"] | None = Field(
         default=None,
@@ -228,7 +228,7 @@ class PreToolUseOutput(BaseModel):
         default=None,
         description="Deprecated: Use hookSpecificOutput.permissionDecisionReason instead"
     )
-    
+
     model_config = {"populate_by_name": True}
 
 
@@ -310,7 +310,7 @@ class HookContext(BaseModel):
 
     request_id: str = Field(..., description="Unique request identifier")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Hook processing timestamp",
     )
     source: str = Field(default="claude_code", description="Source of the hook call")
@@ -328,7 +328,7 @@ class HookError(BaseModel):
         default=None, description="Additional error details"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Error occurrence timestamp",
     )
 
@@ -394,24 +394,24 @@ def create_hook_output(event_type: HookEventName, **kwargs) -> HookOutput:
         # Extract hook-specific parameters
         permission_decision = kwargs.pop("permission_decision", PermissionDecision.ALLOW)
         permission_decision_reason = kwargs.pop("permission_decision_reason", "")
-        
+
         # Extract deprecated parameters if provided
         decision = kwargs.pop("decision", None)
         reason = kwargs.pop("reason", None)
-        
+
         # Create the hook-specific output
         hook_specific_output = PreToolUseHookSpecificOutput(
             permissionDecision=permission_decision,
             permissionDecisionReason=permission_decision_reason
         )
-        
+
         return PreToolUseOutput(
             hookSpecificOutput=hook_specific_output,
             decision=decision,
             reason=reason,
             **kwargs
         )
-    
+
     model_map = {
         HookEventName.POST_TOOL_USE: PostToolUseOutput,
         HookEventName.NOTIFICATION: NotificationOutput,

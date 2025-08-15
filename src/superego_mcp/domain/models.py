@@ -1,7 +1,7 @@
 """Domain models for the Superego MCP Server."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Literal
 
@@ -89,7 +89,7 @@ class ToolRequest(BaseModel):
     session_id: str
     agent_id: str
     cwd: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_validator("parameters")
     @classmethod
@@ -199,7 +199,7 @@ class AuditEntry(BaseModel):
     """Domain model for audit trail entries"""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     request: ToolRequest
     decision: Decision
     rule_matches: list[str]
@@ -211,13 +211,13 @@ class ComponentHealth(BaseModel):
 
     status: Literal["healthy", "degraded", "unhealthy"]
     message: str | None = None
-    last_check: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_check: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class HealthStatus(BaseModel):
     """Overall system health status with component details and metrics"""
 
     status: Literal["healthy", "degraded", "unhealthy"]
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     components: dict[str, ComponentHealth]
     metrics: dict[str, float | dict[str, Any]]

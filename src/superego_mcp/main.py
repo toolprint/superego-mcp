@@ -42,7 +42,7 @@ async def async_main(transport: str = None, port: int = None) -> None:
         # For http or default, use standard logging
         from .infrastructure.logging_config import configure_logging
         configure_logging(level="INFO", json_logs=False)
-    
+
     # Load configuration
     config_manager = ConfigManager()
     config = config_manager.load_config()
@@ -157,7 +157,7 @@ async def async_main(transport: str = None, port: int = None) -> None:
     def signal_handler(signum: int, frame) -> None:
         nonlocal shutdown_count
         shutdown_count += 1
-        
+
         if shutdown_count == 1:
             print("\nShutdown signal received...")
             shutdown_event.set()
@@ -231,7 +231,7 @@ async def async_main(transport: str = None, port: int = None) -> None:
             await inference_manager.cleanup()
 
         print("Server shutdown complete")
-        
+
         # Add a small delay to allow any final cleanup
         await asyncio.sleep(0.1)
 
