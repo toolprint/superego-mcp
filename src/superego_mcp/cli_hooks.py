@@ -49,9 +49,15 @@ class SuperegoHook(BaseModel):
     enabled: bool = Field(default=True, description="Whether the hook is enabled")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
+    # New fields for centralized mode
+    url: Optional[str] = Field(default=None, description="Centralized server URL")
+    token: Optional[str] = Field(default=None, description="Authentication token")
+    mode: str = Field(default="local", description="Hook mode: 'local' or 'centralized'")
+    fallback_enabled: bool = Field(default=False, description="Enable fallback to local on HTTP failure")
+    
     def to_claude_hook(self) -> Dict[str, Any]:
         """Convert to Claude Code hook format."""
-        return {
+        hook_data = {
             "type": "command",
             "command": self.command,
             "timeout": self.timeout,
@@ -60,8 +66,18 @@ class SuperegoHook(BaseModel):
             "_superego_created": self.created_at.isoformat(),
             "_superego_enabled": self.enabled,
             "_superego_matcher": self.matcher,
-            "_superego_event_type": self.event_type
+            "_superego_event_type": self.event_type,
+            "_superego_mode": self.mode,
+            "_superego_fallback": self.fallback_enabled
         }
+        
+        # Add centralized mode specific fields
+        if self.url:
+            hook_data["_superego_url"] = self.url
+        if self.token:
+            hook_data["_superego_token"] = self.token
+            
+        return hook_data
     
     @classmethod
     def from_claude_hook(cls, hook_data: Dict[str, Any], matcher: str, event_type: str = "PreToolUse") -> "SuperegoHook":
@@ -73,7 +89,11 @@ class SuperegoHook(BaseModel):
             command=hook_data.get("command", "superego advise"),
             timeout=hook_data.get("timeout", 5000),
             enabled=hook_data.get("_superego_enabled", True),
-            created_at=datetime.fromisoformat(hook_data.get("_superego_created", datetime.now(timezone.utc).isoformat()))
+            created_at=datetime.fromisoformat(hook_data.get("_superego_created", datetime.now(timezone.utc).isoformat())),
+            url=hook_data.get("_superego_url"),
+            token=hook_data.get("_superego_token"),
+            mode=hook_data.get("_superego_mode", "local"),
+            fallback_enabled=hook_data.get("_superego_fallback", False)
         )
 
 
@@ -182,28 +202,51 @@ class HooksManager:
         self.logger = structlog.get_logger("hooks_manager")
     
     def add_hook(self, matcher: str = "*", event_type: str = "PreToolUse", 
-                 command: str = "superego advise", timeout: int = 5000) -> SuperegoHook:
+                 command: Optional[str] = None, timeout: int = 5000,
+                 url: Optional[str] = None, token: Optional[str] = None,
+                 fallback: bool = False) -> SuperegoHook:
         """Add a new superego hook.
         
         Args:
             matcher: Tool pattern matcher
             event_type: Hook event type
-            command: Command to execute
+            command: Command to execute (auto-generated for centralized mode)
             timeout: Timeout in milliseconds
+            url: Centralized server URL (enables centralized mode)
+            token: Authentication token for centralized server
+            fallback: Enable fallback to local evaluation on HTTP failure
             
         Returns:
             Created SuperegoHook instance
             
         Raises:
             InvalidSettingsError: If settings operations fail
+            ValueError: If URL is invalid
         """
+        # Determine mode and generate command
+        if url:
+            mode = "centralized"
+            if command is None:
+                command = self._generate_curl_command(url, token, timeout, fallback)
+            # Validate URL format
+            if not url.startswith(('http://', 'https://')):
+                raise ValueError("URL must start with http:// or https://")
+        else:
+            mode = "local"
+            if command is None:
+                command = "superego advise"
+        
         # Create new hook
         hook = SuperegoHook(
             id=str(uuid.uuid4()),
             matcher=matcher,
             event_type=event_type,
             command=command,
-            timeout=timeout
+            timeout=timeout,
+            url=url,
+            token=token,
+            mode=mode,
+            fallback_enabled=fallback
         )
         
         # Read current settings
@@ -239,6 +282,51 @@ class HooksManager:
                         hook_id=hook.id, matcher=matcher, event_type=event_type)
         
         return hook
+    
+    def _generate_curl_command(self, url: str, token: Optional[str] = None, 
+                             timeout: int = 5000, fallback: bool = False) -> str:
+        """Generate curl command for centralized hook evaluation.
+        
+        Args:
+            url: Server URL
+            token: Optional authentication token
+            timeout: Request timeout in milliseconds
+            fallback: Whether to enable fallback to local evaluation
+            
+        Returns:
+            Generated curl command string
+        """
+        # Convert timeout from milliseconds to seconds for curl
+        timeout_seconds = max(1, timeout // 1000)
+        
+        # Build curl command
+        curl_parts = [
+            "curl",
+            "--fail",           # Fail on HTTP errors
+            "--silent",         # Don't show progress meter
+            "--show-error",     # Show error messages
+            f"--max-time {timeout_seconds}",  # Request timeout
+            "--retry 2",        # Retry failed requests
+            "--retry-delay 1",  # Wait between retries
+        ]
+        
+        # Add authentication if token provided
+        if token:
+            curl_parts.append(f"--header 'Authorization: Bearer {token}'")
+        
+        # Add JSON data from stdin and endpoint URL
+        curl_parts.extend([
+            "--json @-",        # Send stdin as JSON
+            f'"{url}/v1/hooks"' # Endpoint URL
+        ])
+        
+        curl_cmd = " ".join(curl_parts)
+        
+        # Add fallback logic if enabled
+        if fallback:
+            curl_cmd += " || { echo 'HTTP evaluation failed, falling back to local' >&2; superego advise; }"
+        
+        return curl_cmd
     
     def list_hooks(self, event_type: Optional[str] = None) -> List[SuperegoHook]:
         """List all superego-managed hooks.

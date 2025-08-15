@@ -27,7 +27,7 @@ ai_sampling:
   timeout_seconds: 10
   cache_ttl_seconds: 300
   max_concurrent_requests: 10
-  claude_model: "claude-3-sonnet-20240229"
+  claude_model: "claude-sonnet-4-20250514"
   openai_model: "gpt-4-turbo-preview"
   temperature: 0.0
 
@@ -47,7 +47,7 @@ inference:
       enabled: true       # Enable CLI provider
       type: "claude"
       command: "claude"
-      model: "claude-3-sonnet-20240229"
+      model: "claude-sonnet-4-20250514"
       system_prompt: |
         You are a security evaluation system for tool execution requests.
         

@@ -42,7 +42,7 @@ inference:
       command: "claude"
       # Using non-interactive mode with JSON output for reliable parsing
       args: ["-p", "non-interactive", "--format", "json"]
-      model: "claude-3-sonnet-20240229"
+      model: "claude-sonnet-4-20250514"
       system_prompt: |
         You are a security evaluation system for tool execution requests in a development environment.
         

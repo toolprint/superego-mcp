@@ -4,15 +4,17 @@ import asyncio
 from typing import Any
 
 import structlog
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastmcp import FastMCP
 from pydantic import BaseModel
 from uvicorn import Config, Server
 
 from ..domain.models import Decision, ToolRequest
 from ..domain.security_policy import SecurityPolicyEngine
+from ..domain.claude_code_models import PreToolUseInput, PreToolUseOutput, PreToolUseHookSpecificOutput, PermissionDecision
 from ..infrastructure.error_handler import AuditLogger, ErrorHandler, HealthMonitor
 
 logger = structlog.get_logger(__name__)
@@ -88,7 +90,60 @@ class HTTPTransport:
         # Server instance
         self.server = None
 
+        # Authentication setup
+        self.security = HTTPBearer(auto_error=False)
+        self.auth_enabled = config.get("auth_enabled", False)
+        self.auth_tokens = set(config.get("auth_tokens", []))
+
         self._setup_routes()
+
+    def _decision_to_permission(self, action: str) -> str:
+        """Convert internal Decision action to Claude Code permission decision.
+        
+        Args:
+            action: Internal decision action (allow, deny, ask, etc.)
+            
+        Returns:
+            Claude Code permission decision (allow, deny, ask)
+        """
+        if action in ("allow", "approve"):
+            return "allow"
+        elif action == "ask":
+            return "ask"
+        else:
+            # Default to deny for safety (covers "deny", "block", etc.)
+            return "deny"
+
+    def _verify_auth(self, credentials: HTTPAuthorizationCredentials = None) -> bool:
+        """Verify authentication credentials.
+        
+        Args:
+            credentials: HTTP Bearer credentials
+            
+        Returns:
+            True if authentication is valid or disabled
+            
+        Raises:
+            HTTPException: If authentication fails
+        """
+        if not self.auth_enabled:
+            return True
+            
+        if not credentials:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        if credentials.credentials not in self.auth_tokens:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authentication token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        return True
 
     def _setup_routes(self) -> None:
         """Set up HTTP API routes."""
@@ -144,6 +199,91 @@ class HTTPTransport:
                 )
 
                 return fallback_decision
+
+        @self.app.post("/v1/hooks", response_model=PreToolUseOutput)
+        async def evaluate_hook_request(
+            request: PreToolUseInput,
+            credentials: HTTPAuthorizationCredentials = Depends(self.security)
+        ) -> PreToolUseOutput:
+            """Evaluate a Claude Code PreToolUse hook request.
+
+            Args:
+                request: Claude Code hook input in the PreToolUse format
+
+            Returns:
+                Claude Code hook output with permission decision
+
+            Raises:
+                HTTPException: If evaluation fails
+            """
+            # Verify authentication
+            self._verify_auth(credentials)
+            
+            try:
+                # Convert PreToolUseInput to internal ToolRequest format
+                tool_request = ToolRequest(
+                    tool_name=request.tool_name,
+                    parameters=request.tool_input.model_dump() if hasattr(request.tool_input, 'model_dump') else dict(request.tool_input),
+                    agent_id="claude_code_hook",
+                    session_id=request.session_id,
+                    cwd=request.cwd,
+                )
+
+                logger.info(
+                    "HTTP: Evaluating Claude Code hook request",
+                    tool_name=request.tool_name,
+                    session_id=request.session_id,
+                    hook_event=request.hook_event_name,
+                )
+
+                # Evaluate using security policy
+                decision = await self.security_policy.evaluate(tool_request)
+
+                # Log decision to audit trail
+                rule_matches = [decision.rule_id] if decision.rule_id else []
+                await self.audit_logger.log_decision(
+                    tool_request, decision, rule_matches
+                )
+
+                # Convert Decision to Claude Code hook format
+                permission_decision = self._decision_to_permission(decision.action)
+                
+                hook_specific_output = PreToolUseHookSpecificOutput(
+                    hook_event_name="PreToolUse",
+                    permission_decision=permission_decision,
+                    permission_decision_reason=decision.reason,
+                )
+
+                return PreToolUseOutput(
+                    hook_specific_output=hook_specific_output,
+                    decision="approve" if permission_decision == "allow" else "block",
+                    reason=decision.reason,
+                )
+
+            except Exception as e:
+                logger.error("HTTP: Claude Code hook evaluation failed", error=str(e))
+
+                # Handle errors with centralized error handler
+                fallback_decision = self.error_handler.handle_error(e, tool_request if 'tool_request' in locals() else None)
+
+                # Log fallback decision if we have a tool_request
+                if 'tool_request' in locals():
+                    await self.audit_logger.log_decision(
+                        tool_request, fallback_decision, []
+                    )
+
+                # Convert to hook format (deny on error for safety)
+                hook_specific_output = PreToolUseHookSpecificOutput(
+                    hook_event_name="PreToolUse",
+                    permission_decision="deny",
+                    permission_decision_reason=f"Evaluation error: {str(e)}",
+                )
+
+                return PreToolUseOutput(
+                    hook_specific_output=hook_specific_output,
+                    decision="block",
+                    reason=f"Evaluation error: {str(e)}",
+                )
 
         @self.app.get("/v1/health", response_model=HealthResponse)
         async def health_check() -> HealthResponse:
@@ -255,6 +395,7 @@ class HTTPTransport:
                 "transport": "http",
                 "endpoints": {
                     "evaluate": "/v1/evaluate",
+                    "hooks": "/v1/hooks",
                     "health": "/v1/health",
                     "rules": "/v1/config/rules",
                     "audit": "/v1/audit/recent",

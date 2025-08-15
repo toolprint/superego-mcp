@@ -45,7 +45,7 @@ class SamplingConfig(BaseModel):
     max_concurrent_requests: int = 10
 
     # Provider-specific settings
-    claude_model: str = "claude-3-sonnet-20240229"
+    claude_model: str = "claude-sonnet-4-20250514"
     openai_model: str = "gpt-4-turbo-preview"
     temperature: float = 0.0  # Low temperature for consistent security decisions
 

@@ -20,33 +20,33 @@ rate_limit_requests: 100
 
 # AI Sampling Configuration (Legacy - maintained for backward compatibility)
 ai_sampling:
-  enabled: true
+  enabled: false
   primary_provider: "claude"
   fallback_provider: "openai"
   timeout_seconds: 10
   cache_ttl_seconds: 300
   max_concurrent_requests: 10
-  claude_model: "claude-3-sonnet-20240229"
+  claude_model: "claude-sonnet-4-20250514"
   openai_model: "gpt-4-turbo-preview"
   temperature: 0.0
 
 # Inference System Configuration (New extensible system)
 inference:
   # Default timeout for all inference requests
-  timeout_seconds: 10
+  timeout_seconds: 30
   
   # Provider preference order (first successful wins)
   provider_preference:
-    - "mcp_sampling"    # Use existing MCP sampling as primary
-    # - "claude_cli"    # Uncomment to enable CLI provider
+    - "claude_cli"      # Use Claude CLI as primary
+    - "mcp_sampling"    # Use existing MCP sampling as fallback
   
   # CLI provider configurations
   cli_providers:
     - name: "claude_cli"
-      enabled: false     # Set to true to enable CLI provider
+      enabled: true      # Enable CLI provider
       type: "claude"
       command: "claude"
-      model: "claude-3-sonnet-20240229"
+      model: "claude-sonnet-4-20250514"
       system_prompt: |
         You are a security evaluation system for tool execution requests.
         Respond with JSON containing:

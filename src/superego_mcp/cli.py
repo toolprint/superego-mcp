@@ -76,10 +76,14 @@ Examples:
   # Launch MCP server with explicit stdio transport
   superego mcp -t stdio
   
-  # Manage Claude Code hooks
+  # Manage Claude Code hooks (local mode)
   superego hooks add --matcher "Bash|Write|Edit|MultiEdit"
   superego hooks list
   superego hooks remove --matcher "*"
+  
+  # Centralized server mode
+  superego hooks add --matcher "Bash|Write|Edit" --url http://localhost:8000
+  superego hooks add --matcher "*" --url https://superego.company.com --token <auth-token>
 
 Claude Code Hook Integration:
   # Add as a direct hook command:
@@ -247,11 +251,14 @@ preserving existing Claude Code configurations.
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Add a hook for all tools (default)
+  # Local evaluation (default)
   superego hooks add
-  
-  # Add a hook for specific tools
   superego hooks add --matcher "Bash|Write|Edit|MultiEdit"
+  
+  # Centralized server evaluation
+  superego hooks add --matcher "*" --url http://localhost:8000
+  superego hooks add --matcher "Bash|Write|Edit" --url https://superego.company.com --token abc123
+  superego hooks add --matcher "*" --url http://localhost:8000 --fallback
   
   # List all superego-managed hooks
   superego hooks list
@@ -268,6 +275,16 @@ Common Matchers:
   Bash                        Shell commands only
   Write|Edit|MultiEdit        File modification tools
   mcp__.*                     All MCP tools
+
+Centralized vs Local Mode:
+  Local mode (default): Each hook spawns a 'superego advise' process
+  Centralized mode (--url): Hooks send requests to a running MCP server via curl
+  
+  Centralized mode benefits:
+  - Single evaluation process reduces overhead
+  - Supports remote server deployment
+  - Consistent security policies across team/organization
+  - Optional authentication with Bearer tokens
 
 Claude Code Integration:
   Hooks are automatically configured in ~/.claude/settings.json
@@ -310,6 +327,26 @@ Claude Code Integration:
         default="PreToolUse",
         help="Hook event type (default: PreToolUse)",
         metavar="TYPE",
+    )
+    
+    add_parser.add_argument(
+        "--url",
+        type=str,
+        help="Centralized server URL (enables centralized mode)",
+        metavar="URL",
+    )
+    
+    add_parser.add_argument(
+        "--token",
+        type=str,
+        help="Authentication token for centralized server",
+        metavar="TOKEN",
+    )
+    
+    add_parser.add_argument(
+        "--fallback",
+        action="store_true",
+        help="Enable fallback to local evaluation on HTTP failure",
     )
     
     # List hooks command
@@ -537,17 +574,32 @@ async def cmd_hooks_add(args: argparse.Namespace, hooks_manager) -> int:
         hook = hooks_manager.add_hook(
             matcher=matcher,
             event_type=args.event_type,
-            timeout=args.timeout
+            timeout=args.timeout,
+            url=getattr(args, 'url', None),
+            token=getattr(args, 'token', None),
+            fallback=getattr(args, 'fallback', False)
         )
         
         print(f"✓ Successfully added Superego hook")
         print(f"  ID: {hook.id}")
         print(f"  Matcher: {hook.matcher}")
         print(f"  Event Type: {hook.event_type}")
+        print(f"  Mode: {hook.mode}")
+        if hook.url:
+            print(f"  URL: {hook.url}")
+            if hook.token:
+                print(f"  Authentication: Bearer token configured")
+            if hook.fallback_enabled:
+                print(f"  Fallback: Enabled (will use local evaluation if HTTP fails)")
         print(f"  Command: {hook.command}")
         print(f"  Timeout: {hook.timeout}ms")
         print()
-        print("The hook will be active the next time you use Claude Code.")
+        if hook.mode == "centralized":
+            print("The hook is configured for centralized evaluation.")
+            print("Make sure the Superego MCP server is running at the specified URL.")
+        else:
+            print("The hook will be active the next time you use Claude Code.")
+        print("Use 'superego hooks list' to view all installed hooks.")
         
         return 0
         
