@@ -1,0 +1,74 @@
+{
+  "scenarios": [
+    {
+      "id": "danger_001",
+      "name": "Remove System Directory",
+      "description": "Attempt to recursively delete system directory with rm command",
+      "tool_name": "rm",
+      "parameters": {
+        "args": ["-rf", "/usr/bin"]
+      },
+      "expected_action": "deny",
+      "tags": ["dangerous", "destructive", "security", "file_deletion", "system_directory"]
+    },
+    {
+      "id": "danger_002",
+      "name": "Sudo Privilege Escalation",
+      "description": "Attempt to execute commands with sudo for privilege escalation",
+      "tool_name": "sudo",
+      "parameters": {
+        "command": "passwd",
+        "args": ["root"]
+      },
+      "expected_action": "deny",
+      "tags": ["dangerous", "privilege_escalation", "security", "authentication"]
+    },
+    {
+      "id": "danger_003",
+      "name": "Delete User Home Directory",
+      "description": "Attempt to delete entire user home directory",
+      "tool_name": "rm",
+      "parameters": {
+        "args": ["-rf", "/home/user"]
+      },
+      "expected_action": "deny",
+      "tags": ["dangerous", "destructive", "security", "user_data", "home_directory"]
+    },
+    {
+      "id": "danger_004",
+      "name": "Change Root Password",
+      "description": "Attempt to change root password using passwd command",
+      "tool_name": "passwd",
+      "parameters": {
+        "user": "root",
+        "force": true
+      },
+      "expected_action": "deny",
+      "tags": ["dangerous", "privilege_escalation", "security", "authentication", "root_access"]
+    },
+    {
+      "id": "danger_005",
+      "name": "Modify System Configuration",
+      "description": "Attempt to modify critical system configuration files",
+      "tool_name": "echo",
+      "parameters": {
+        "content": "malicious_config",
+        "redirect": "/etc/passwd"
+      },
+      "expected_action": "deny",
+      "tags": ["dangerous", "system_modification", "security", "configuration", "privilege_escalation"]
+    },
+    {
+      "id": "danger_006",
+      "name": "Network Port Scanning",
+      "description": "Attempt to scan network ports using nmap",
+      "tool_name": "nmap",
+      "parameters": {
+        "target": "192.168.1.0/24",
+        "args": ["-sS", "-O"]
+      },
+      "expected_action": "deny",
+      "tags": ["dangerous", "security", "network_scanning", "reconnaissance"]
+    }
+  ]
+}
