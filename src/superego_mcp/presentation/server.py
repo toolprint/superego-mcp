@@ -112,7 +112,7 @@ class SuperegoMCPServer:
             """
             return {
                 "name": "superego-mcp",
-                "version": "0.1.0",
+                "version": "0.0.0",
                 "description": "Intelligent tool request interception for AI agents",
                 "config": {
                     "host": self.config.host,

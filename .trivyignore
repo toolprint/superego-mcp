@@ -1,0 +1,15 @@
+# Trivy ignore file for production security scanning
+# This file contains exceptions for known false positives or accepted risks
+
+# Python base image vulnerabilities that don't affect our use case
+# (Add specific CVEs here after security review)
+
+# Development dependencies not present in production
+# These are filtered out during build process
+CVE-2024-EXAMPLE-DEV
+
+# Low/informational severity issues that have been assessed as acceptable risk
+# Document each with justification
+
+# Temporary exceptions (should be removed after updates)
+# Format: CVE-YYYY-NNNNN # Temporary until version X.Y.Z

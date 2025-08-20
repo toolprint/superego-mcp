@@ -1,0 +1,142 @@
+# Trivy Configuration for Production Security Scanning
+# Comprehensive vulnerability scanning with production-ready settings
+
+# Output configuration
+format: table
+output: trivy-report.txt
+
+# Scan targets and depth
+scan:
+  # Security scanners to use
+  security-checks:
+    - vuln      # Vulnerability scanning
+    - config    # Configuration scanning  
+    - secret    # Secret detection
+    - license   # License scanning
+
+  # Vulnerability databases
+  db:
+    skip-update: false
+    light: false
+
+  # Scanning options
+  timeout: 15m0s
+  quiet: false
+  debug: false
+
+# Vulnerability configuration
+vulnerability:
+  # Severity levels to report
+  severity:
+    - CRITICAL
+    - HIGH
+    - MEDIUM
+    - LOW
+    - UNKNOWN
+
+  # Exit codes
+  exit-code: 1  # Fail CI on vulnerabilities
+
+  # Ignore unfixed vulnerabilities
+  ignore-unfixed: false
+
+  # VEX (Vulnerability Exchange) support
+  vex: ""
+
+# Secret scanning configuration
+secret:
+  # Secret scanning rules
+  config: ""
+  
+  # Additional secret patterns
+  additional-patterns: |
+    # API Keys
+    - pattern: 'sk-[a-zA-Z0-9]{48}'
+      name: openai-api-key
+    - pattern: 'claude-[a-zA-Z0-9-]{50,100}'
+      name: anthropic-api-key
+    
+    # Database URLs
+    - pattern: 'postgresql://[^:]+:[^@]+@[^/]+/\w+'
+      name: postgresql-url
+    - pattern: 'mysql://[^:]+:[^@]+@[^/]+/\w+'
+      name: mysql-url
+    
+    # Generic secrets
+    - pattern: '[sS][eE][cC][rR][eE][tT][_-]?[kK][eE][yY]\s*[:=]\s*["\']?[a-zA-Z0-9+/=]{20,}["\']?'
+      name: generic-secret-key
+
+# Configuration scanning
+config:
+  # Configuration file types to scan
+  file-patterns:
+    - "*.yaml"
+    - "*.yml" 
+    - "*.json"
+    - "Dockerfile*"
+    - "docker-compose*.yml"
+    - "docker-compose*.yaml"
+
+  # Policy bundles to use
+  policy:
+    - "https://raw.githubusercontent.com/aquasecurity/trivy-policies/main/docker/dockerfile.rego"
+    - "https://raw.githubusercontent.com/aquasecurity/trivy-policies/main/docker/compose.rego"
+
+# License scanning
+license:
+  # Forbidden licenses
+  forbidden:
+    - GPL-2.0
+    - GPL-3.0
+    - AGPL-3.0
+    - LGPL-2.1
+    - LGPL-3.0
+  
+  # Allowed licenses (if specified, only these are allowed)
+  allowed: []
+  
+  # License confidence threshold
+  confidence-level: 0.9
+
+# Cache configuration
+cache:
+  backend: fs
+  ttl: 24h
+
+# Filtering and ignoring
+ignore:
+  # Files to ignore during scanning
+  paths:
+    - "**/.git/**"
+    - "**/node_modules/**"
+    - "**/vendor/**"
+    - "**/__pycache__/**"
+    - "**/htmlcov/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/*.pyc"
+    - "**/.pytest_cache/**"
+    - "**/.coverage"
+    - "**/coverage.xml"
+
+  # Use .trivyignore file for vulnerability exceptions
+  ignorefile: .trivyignore
+
+# Report configuration  
+report:
+  # Summary format
+  summary: true
+  
+  # Include dependency paths
+  dependency-tree: true
+  
+  # List all packages (including those without vulnerabilities)
+  list-all-pkgs: false
+
+# Integration settings
+integration:
+  # GitHub Security Advisory integration
+  github-advisory-db: true
+  
+  # GitLab Advisory Database
+  gitlab-advisory-db: true

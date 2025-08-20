@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .cli_client import SuperegoHTTPClient
 from .cli_eval import CLIEvaluator
 from .infrastructure.logging_config import configure_stderr_logging
 from .main import async_main as mcp_async_main
@@ -61,11 +62,17 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run security evaluation (for Claude Code hooks)
+  # Run security evaluation (for Claude Code hooks) - local mode
   echo '{"tool_name": "bash", "tool_input": {"command": "rm -rf /"}}' | superego advise
 
-  # Run evaluation with custom config
+  # Run evaluation with custom config - local mode
   superego advise -c ~/.toolprint/superego/config.yaml < hook_input.json
+
+  # Run evaluation via remote server - client mode
+  superego advise --url http://localhost:8000 < hook_input.json
+
+  # Client mode with authentication and custom timeout
+  superego advise --url https://superego.company.com --token abc123 --timeout 10 < hook_input.json
 
   # Launch MCP server (default: stdio transport)
   superego mcp
@@ -147,6 +154,9 @@ https://docs.anthropic.com/en/docs/claude-code/hooks-guide
 Run a security evaluation on tool input provided via stdin.
 Reads JSON hook input from stdin and outputs decision JSON to stdout.
 Designed for use as a Claude Code PreToolUse hook.
+
+Local Mode (default): Evaluates requests locally using mock provider.
+Client Mode (--url): Forwards requests to a remote Superego MCP server.
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -186,6 +196,28 @@ Output Format:
         metavar="PATH",
     )
 
+    advise_parser.add_argument(
+        "--url",
+        type=str,
+        help="Server URL for client mode (enables HTTP forwarding instead of local evaluation)",
+        metavar="URL",
+    )
+
+    advise_parser.add_argument(
+        "--token",
+        type=str,
+        help="Authentication token for server requests (use with --url)",
+        metavar="TOKEN",
+    )
+
+    advise_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=5,
+        help="HTTP request timeout in seconds (default: 5)",
+        metavar="SECONDS",
+    )
+
     # Create the mcp subcommand
     mcp_parser = subparsers.add_parser(
         "mcp",
@@ -199,12 +231,18 @@ Provides rule management and security evaluation tools for AI agents.
 Default Configuration:
   - Config path: ~/.toolprint/superego/config.yaml
   - Inference provider: Claude CLI (requires Claude Code installation)
+  - Architecture: Unified FastAPI + MCP server (single process)
   - Transport: STDIO mode (configurable with -t/--transport)
   - Port: 8000 for HTTP mode (configurable with -p/--port)
 
 Transport Options:
-  - stdio: Standard I/O transport (default, uses stderr for logging)
-  - http: HTTP transport on specified port (uses stdout for logging)
+  - stdio: Standard I/O transport for MCP (default, uses stderr for logging)
+  - http: HTTP/WebSocket transport with FastAPI (uses stdout for logging)
+  - unified: Both STDIO and HTTP in single process (experimental)
+
+Architecture:
+  The unified server combines FastAPI (HTTP/WebSocket) and FastMCP (stdio) in a single process.
+  This provides better performance and simplified deployment while maintaining backward compatibility.
 
 The server will validate Claude CLI availability on startup.
 If Claude is not available, the server will exit with an error.
@@ -231,7 +269,7 @@ Signal handling: Ctrl-C (SIGINT) and SIGTERM will cleanly shut down the server.
         "-t",
         "--transport",
         type=str,
-        choices=["stdio", "http"],
+        choices=["stdio", "http", "unified"],
         default="stdio",
         help="Transport mode for the MCP server (default: stdio)",
         metavar="TRANSPORT",
@@ -463,39 +501,65 @@ async def cmd_advise(args: argparse.Namespace) -> int:
         # Configure logging to stderr with minimal noise for CLI usage
         configure_stderr_logging(level="WARNING", json_logs=False)
 
-        # Get config path - if specified and exists, validate it
-        config_path = args.config or ensure_default_config_dir()
-
-        if args.config and not config_path.exists():
-            print(
-                f"Error: Specified config file does not exist: {config_path}",
-                file=sys.stderr,
-            )
-            return 1
-
-        # Load configuration if it exists
-        if config_path.exists():
-            try:
-                from .infrastructure.config import ConfigManager
-
-                config_manager = ConfigManager(str(config_path))
-                config_manager.load_config()
-            except Exception as e:
+        # Check if client mode is requested
+        if args.url:
+            # Client mode: forward to remote server
+            if not args.url.startswith(("http://", "https://")):
                 print(
-                    f"Warning: Failed to load config from {config_path}: {e}",
+                    "Error: URL must start with http:// or https://",
                     file=sys.stderr,
                 )
-                print("Continuing with default configuration...", file=sys.stderr)
+                return 1
 
-        # Use the existing CLI evaluator (could be enhanced with config in the future)
-        evaluator = CLIEvaluator()
+            # Create HTTP client
+            client = SuperegoHTTPClient(
+                base_url=args.url,
+                token=args.token,
+                timeout=args.timeout,
+            )
 
-        # Run evaluation
-        result = await evaluator.evaluate_from_stdin()
+            # Run evaluation via HTTP client
+            result = await client.evaluate_from_stdin()
 
-        # Output result as JSON
-        print(json.dumps(result))
-        return 0
+            # Output result as JSON
+            print(json.dumps(result))
+            return 0
+
+        else:
+            # Local mode: use existing CLI evaluator
+            # Get config path - if specified and exists, validate it
+            config_path = args.config or ensure_default_config_dir()
+
+            if args.config and not config_path.exists():
+                print(
+                    f"Error: Specified config file does not exist: {config_path}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # Load configuration if it exists
+            if config_path.exists():
+                try:
+                    from .infrastructure.config import ConfigManager
+
+                    config_manager = ConfigManager(str(config_path))
+                    config_manager.load_config()
+                except Exception as e:
+                    print(
+                        f"Warning: Failed to load config from {config_path}: {e}",
+                        file=sys.stderr,
+                    )
+                    print("Continuing with default configuration...", file=sys.stderr)
+
+            # Use the existing CLI evaluator
+            evaluator = CLIEvaluator()
+
+            # Run evaluation
+            result = await evaluator.evaluate_from_stdin()
+
+            # Output result as JSON
+            print(json.dumps(result))
+            return 0
 
     except ValueError as e:
         # Non-blocking error - show to user
@@ -532,22 +596,30 @@ async def cmd_mcp(args: argparse.Namespace) -> int:
                 return 1
             print("Claude CLI validation successful.")
 
+        # Handle unified transport mode (default to None for backward compatibility)
+        transport_mode = args.transport if args.transport != "unified" else None
+
+        # If unified mode is requested, start both transports
+        if args.transport == "unified":
+            print("Starting unified server (FastAPI + MCP in single process)")
+            transport_mode = None  # Let the unified server handle both
+
         # Update main.py to use custom config path if provided
         if args.config:
             print(f"Using configuration from: {config_path}")
             await mcp_async_main_with_config(
-                config_path, transport=args.transport, port=args.port
+                config_path, transport=transport_mode, port=args.port
             )
         else:
             # Check if default config path exists
             if config_path.exists():
                 print(f"Using default configuration from: {config_path}")
                 await mcp_async_main_with_config(
-                    config_path, transport=args.transport, port=args.port
+                    config_path, transport=transport_mode, port=args.port
                 )
             else:
                 print("Using default configuration (no config file found)")
-                await mcp_async_main(transport=args.transport, port=args.port)
+                await mcp_async_main(transport=transport_mode, port=args.port)
 
         return 0
 

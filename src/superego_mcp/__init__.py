@@ -5,7 +5,7 @@ from AI agents, applying configurable rules and policies to determine whether
 requests should be allowed, modified, or blocked.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.0.0"
 __author__ = "Superego MCP Team"
 __email__ = "team@superego-mcp.dev"
 

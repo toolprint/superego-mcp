@@ -1,0 +1,216 @@
+# Promtail Configuration for Superego MCP Log Collection
+# Collects logs from Docker containers and system logs
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: superego-mcp
+
+positions:
+  filename: /tmp/positions.yaml
+
+scrape_configs:
+  # Docker container logs
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containerlogs
+          __path__: /var/lib/docker/containers/*/*log
+    
+    # Pipeline for processing Docker JSON logs
+    pipeline_stages:
+      # Parse Docker JSON log format
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs:
+      
+      # Parse timestamp
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+          
+      # Add container labels
+      - labels:
+          stream:
+      
+      # Extract container name and ID from file path
+      - regex:
+          expression: '^/var/lib/docker/containers/(?P<container_id>[0-9a-f]{64})/[0-9a-f]{64}-json\.log$'
+          source: filename
+      
+      - labels:
+          container_id:
+          
+      # Output the log line
+      - output:
+          source: output
+
+  # Superego MCP application logs
+  - job_name: superego-mcp
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: superego-mcp
+          service: superego-mcp
+          __path__: /var/log/nginx/access.log
+    
+    pipeline_stages:
+      # Parse JSON access logs from nginx
+      - json:
+          expressions:
+            time_local: time_local
+            remote_addr: remote_addr
+            request: request
+            status: status
+            body_bytes_sent: body_bytes_sent
+            request_time: request_time
+            upstream_response_time: upstream_response_time
+            
+      # Parse nginx timestamp
+      - timestamp:
+          source: time_local
+          format: '02/Jan/2006:15:04:05 -0700'
+          
+      # Add labels for status codes
+      - labels:
+          status_class: "{{ if eq .status \"200\" }}2xx{{ else if eq .status \"404\" }}4xx{{ else if eq .status \"500\" }}5xx{{ else }}other{{ end }}"
+          
+      # Add labels for HTTP method
+      - regex:
+          expression: '^(?P<method>\w+) (?P<path>.+) HTTP'
+          source: request
+          
+      - labels:
+          method:
+          path:
+
+  # Nginx error logs
+  - job_name: nginx-errors
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-errors
+          service: nginx
+          level: error
+          __path__: /var/log/nginx/error.log
+    
+    pipeline_stages:
+      # Parse nginx error log format
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<pid>\d+)#(?P<tid>\d+): (?P<message>.*)$'
+          
+      - timestamp:
+          source: timestamp
+          format: '2006/01/02 15:04:05'
+          
+      - labels:
+          level:
+          pid:
+
+  # System logs (optional)
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          __path__: /var/log/syslog
+    
+    pipeline_stages:
+      # Parse syslog format
+      - regex:
+          expression: '^(?P<timestamp>\w{3} \d{1,2} \d{2}:\d{2}:\d{2}) (?P<hostname>\w+) (?P<service>[\w\-\.]+)(?:\[(?P<pid>\d+)\])?: (?P<message>.*)$'
+          
+      - timestamp:
+          source: timestamp
+          format: 'Jan 02 15:04:05'
+          location: 'Local'
+          
+      - labels:
+          hostname:
+          service:
+          
+  # Application-specific structured logs
+  - job_name: superego-structured
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: superego-structured
+          service: superego-mcp
+          __path__: /app/logs/*.log
+    
+    pipeline_stages:
+      # Assume JSON structured logging from superego-mcp
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            logger: logger
+            message: message
+            component: component
+            trace_id: trace_id
+            user_id: user_id
+            request_id: request_id
+            
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+          
+      - labels:
+          level:
+          logger:
+          component:
+
+  # Security audit logs
+  - job_name: security-audit
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security-audit
+          service: superego-mcp
+          component: security
+          __path__: /app/logs/security*.log
+    
+    pipeline_stages:
+      # Parse security event logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            event_type: event_type
+            user_id: user_id
+            ip_address: ip_address
+            action: action
+            resource: resource
+            result: result
+            reason: reason
+            
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+          
+      - labels:
+          event_type:
+          result:
+          action:
+
+# Global configuration
+global:
+  # Scrape timeout
+  scrape_timeout: 10s
+  
+  # External labels applied to all log streams
+  external_labels:
+    cluster: superego-production
+    environment: production

@@ -184,7 +184,7 @@ class SSETransport:
         self.app = FastAPI(
             title="Superego MCP SSE",
             description="Server-Sent Events transport for Superego MCP Server",
-            version="0.1.0",
+            version="0.0.0",
         )
 
         # Add CORS middleware

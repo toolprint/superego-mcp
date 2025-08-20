@@ -135,7 +135,7 @@ homebrew-formula: build
     @echo "class Superego < Formula" > superego.rb
     @echo "  desc \"Intelligent tool request interception for AI agents\"" >> superego.rb
     @echo "  homepage \"https://github.com/toolprint/superego-mcp\"" >> superego.rb
-    @echo "  url \"https://files.pythonhosted.org/packages/source/s/superego-mcp/superego-mcp-0.1.0.tar.gz\"" >> superego.rb
+    @echo "  url \"https://files.pythonhosted.org/packages/source/s/superego-mcp/superego-mcp-0.0.0.tar.gz\"" >> superego.rb
     @echo "  sha256 \"$(sha256sum dist/*.tar.gz | cut -d' ' -f1)\"" >> superego.rb
     @echo "  license \"MIT\"" >> superego.rb
     @echo "" >> superego.rb
@@ -161,7 +161,7 @@ install-dev: build
             pipx uninstall superego-mcp; \
         fi; \
         echo "Installing from local wheel..."; \
-        pipx install --force ./dist/superego_mcp-0.1.0-py3-none-any.whl; \
+        pipx install --force ./dist/superego_mcp-0.0.0-py3-none-any.whl; \
         echo "✓ Installed superego-mcp with pipx"; \
         echo "Testing installation..."; \
         superego --version; \
@@ -265,7 +265,7 @@ demo-all: demo-scenarios demo-fastagent-simple
 # Show project info
 info:
     @echo "Project: Superego MCP Server"
-    @echo "Version: 0.1.0"
+    @echo "Version: 0.0.0"
     @echo "Python: $(python --version)"
     @echo "UV: $(uv --version)"
     @echo ""
@@ -353,3 +353,417 @@ profile:
 profile-analyze:
     @echo "Analyzing profile results..."
     uv run python -m pstats profile.stats
+
+# =============================================================================
+# CONTAINER TESTING TASKS
+# Comprehensive testing for containerized deployment
+# =============================================================================
+
+# Validate container testing environment
+test-container-validate:
+    @echo "Validating container testing environment..."
+    @echo "Installing container test dependencies..."
+    @uv sync --extra container-test
+    uv run python scripts/test_container_validation.py
+
+# Build container image for testing
+test-container-build:
+    @echo "Building container image for testing..."
+    docker build -t superego-mcp:latest -f docker/production/Dockerfile .
+    @echo "✓ Container image built successfully"
+
+# Run basic container tests
+test-container:
+    @echo "Running container tests..."
+    @echo "Installing container test dependencies..."
+    @uv sync --extra container-test
+    uv run pytest tests/test_container.py -v --tb=short
+    @echo "✓ Container tests completed"
+
+# Run container tests with specific markers
+test-container-startup:
+    @echo "Running container startup tests..."
+    uv run pytest tests/test_container.py::TestContainerStartup -v
+
+test-container-transports:
+    @echo "Running container transport tests..."
+    uv run pytest tests/test_container.py::TestContainerTransports -v
+
+test-container-performance:
+    @echo "Running container performance tests..."
+    uv run pytest tests/test_container.py::TestContainerPerformance -v
+
+test-container-security:
+    @echo "Running container security tests..."
+    uv run pytest tests/test_container.py::TestContainerSecurity -v
+
+test-container-limits:
+    @echo "Running container resource limit tests..."
+    uv run pytest tests/test_container.py::TestContainerResourceLimits -v
+
+test-container-integration:
+    @echo "Running container integration tests..."
+    uv run pytest tests/test_container.py::TestContainerIntegration -v
+
+test-container-scenarios:
+    @echo "Running container deployment scenario tests..."
+    uv run pytest tests/test_container.py::TestContainerScenarios -v
+
+# Run performance benchmark tests (marked with @pytest.mark.performance)
+test-container-benchmarks:
+    @echo "Running container performance benchmarks..."
+    uv run pytest tests/test_container.py::TestContainerPerformanceBenchmarks -v -m performance
+
+# Run comprehensive container test suite
+test-container-full: test-container-build test-container
+    @echo "✓ Full container test suite completed"
+
+# Run container tests in Docker Compose environment
+test-container-compose:
+    @echo "Testing container in Docker Compose environment..."
+    @echo "Starting basic services..."
+    docker-compose up -d superego-mcp redis
+    @echo "Waiting for services to be ready..."
+    sleep 30
+    @echo "Running container validation tests..."
+    docker-compose exec superego-mcp curl -f http://localhost:8000/v1/health || echo "Health check failed"
+    docker-compose exec superego-mcp curl -f http://localhost:8000/v1/server-info || echo "Server info failed"
+    @echo "Stopping services..."
+    docker-compose down
+    @echo "✓ Docker Compose container tests completed"
+
+# Test container with resource limits
+test-container-with-limits:
+    @echo "Testing container with strict resource limits..."
+    docker run --rm -d \
+        --name test-superego-limits \
+        --memory=512m \
+        --cpus=1.0 \
+        -p 8080:8000 \
+        -e SUPEREGO_ENV=test \
+        superego-mcp:latest
+    @echo "Waiting for container to start..."
+    sleep 15
+    @echo "Testing container health..."
+    curl -f http://localhost:8080/v1/health || echo "Health check failed"
+    @echo "Stopping test container..."
+    docker stop test-superego-limits
+    @echo "✓ Resource limit tests completed"
+
+# Validate container startup performance
+test-container-startup-time:
+    @echo "Testing container startup performance..."
+    @echo "Starting container and measuring startup time..."
+    start_time=$$(date +%s); \
+    docker run --rm -d --name test-superego-startup -p 8081:8000 superego-mcp:latest; \
+    while ! curl -s http://localhost:8081/v1/health >/dev/null 2>&1; do \
+        sleep 1; \
+        if [ $$(($(date +%s) - start_time)) -gt 60 ]; then \
+            echo "❌ Startup timeout exceeded 60 seconds"; \
+            docker stop test-superego-startup 2>/dev/null || true; \
+            exit 1; \
+        fi; \
+    done; \
+    end_time=$$(date +%s); \
+    startup_time=$$((end_time - start_time)); \
+    echo "✓ Container startup time: $${startup_time}s"; \
+    docker stop test-superego-startup; \
+    if [ $$startup_time -gt 30 ]; then \
+        echo "⚠️  Startup time exceeds 30s threshold"; \
+    fi
+
+# Clean up container test artifacts
+test-container-clean:
+    @echo "Cleaning up container test artifacts..."
+    @docker stop $$(docker ps -q --filter "name=test-superego") 2>/dev/null || true
+    @docker rm $$(docker ps -aq --filter "name=test-superego") 2>/dev/null || true
+    @docker network prune -f
+    @echo "✓ Container test cleanup completed"
+
+# ============================================================================= 
+# DOCKER WORKFLOW TASKS
+# Comprehensive Docker workflow for development and production deployment
+# =============================================================================
+
+# Build Docker images (production and development)
+docker-build target="all":
+    @echo "Building Docker images for target: {{target}}"
+    @if [ "{{target}}" = "all" ] || [ "{{target}}" = "production" ]; then \
+        echo "Building production image with docker-bake..."; \
+        export BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ'); \
+        export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown"); \
+        export VERSION=$(grep '^version' pyproject.toml | cut -d'"' -f2); \
+        docker buildx bake production; \
+    fi
+    @if [ "{{target}}" = "all" ] || [ "{{target}}" = "development" ]; then \
+        echo "Building development image with docker-bake..."; \
+        export BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ'); \
+        export GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown"); \
+        export VERSION=$(grep '^version' pyproject.toml | cut -d'"' -f2); \
+        docker buildx bake development; \
+    fi
+    @echo "✓ Docker images built successfully for {{target}}"
+
+# Build production image only  
+docker-build-prod:
+    @echo "Building production Docker image..."
+    just docker-build production
+
+# Build development image only
+docker-build-dev:
+    @echo "Building development Docker image..."
+    just docker-build development
+
+# Start development environment with hot-reload
+docker-dev action="up":
+    @echo "Managing development Docker environment..."
+    @if [ "{{action}}" = "up" ]; then \
+        echo "Starting development environment with hot-reload..."; \
+        echo "🔥 Hot-reload enabled for: src/, config/, tests/"; \
+        echo "🐛 Debug port available: 5678 (set DEBUGPY_ENABLED=1)"; \
+        echo "📊 Server: http://localhost:8002"; \
+        echo "📈 Monitor: http://localhost:8003 (with --profile monitoring)"; \
+        echo ""; \
+        echo "Use Ctrl+C to stop, or run 'just docker-dev stop' from another terminal"; \
+        docker-compose -f docker-compose.dev.yml up superego-dev; \
+    elif [ "{{action}}" = "start" ]; then \
+        echo "Starting development environment in background..."; \
+        docker-compose -f docker-compose.dev.yml up -d superego-dev; \
+        echo "✓ Development environment started"; \
+        echo "📊 Server: http://localhost:8002"; \
+        echo "📋 Logs: just docker-dev logs"; \
+        echo "🔧 Shell: just docker-dev shell"; \
+    elif [ "{{action}}" = "stop" ]; then \
+        echo "Stopping development environment..."; \
+        docker-compose -f docker-compose.dev.yml down; \
+        echo "✓ Development environment stopped"; \
+    elif [ "{{action}}" = "restart" ]; then \
+        echo "Restarting development environment..."; \
+        docker-compose -f docker-compose.dev.yml restart superego-dev; \
+        echo "✓ Development environment restarted"; \
+    elif [ "{{action}}" = "logs" ]; then \
+        echo "Showing development environment logs (Ctrl+C to exit)..."; \
+        docker-compose -f docker-compose.dev.yml logs -f superego-dev; \
+    elif [ "{{action}}" = "shell" ]; then \
+        echo "Opening shell in development container..."; \
+        docker-compose -f docker-compose.dev.yml exec superego-dev bash; \
+    elif [ "{{action}}" = "status" ]; then \
+        echo "Development environment status:"; \
+        docker-compose -f docker-compose.dev.yml ps superego-dev; \
+        if docker-compose -f docker-compose.dev.yml ps superego-dev | grep -q "Up"; then \
+            echo "📊 Server: http://localhost:8002"; \
+            echo "🏥 Health: http://localhost:8002/health"; \
+            curl -sf http://localhost:8002/health > /dev/null 2>&1 && echo "✓ Health check: PASSED" || echo "✗ Health check: FAILED"; \
+        fi; \
+    else \
+        echo "Invalid action: {{action}}"; \
+        echo "Available actions: up, start, stop, restart, logs, shell, status"; \
+        exit 1; \
+    fi
+
+# Start development environment with full monitoring
+docker-dev-full:
+    @echo "Starting development environment with monitoring dashboard..."
+    @echo "📊 Server: http://localhost:8002"
+    @echo "📈 Monitor: http://localhost:8003" 
+    docker-compose -f docker-compose.dev.yml --profile full up
+
+# Start development environment with debugging enabled
+docker-dev-debug wait="false":
+    @echo "Starting development environment with debugging..."
+    @if [ "{{wait}}" = "true" ]; then \
+        echo "🐛 Server will WAIT for debugger client on port 5678"; \
+        echo "Configure your IDE to connect to localhost:5678 before server starts"; \
+        export DEBUGPY_ENABLED=1; \
+        export DEBUGPY_WAIT_FOR_CLIENT=1; \
+    else \
+        echo "🐛 Debugger available on port 5678 (non-blocking)"; \
+        echo "Configure your IDE to connect to localhost:5678"; \
+        export DEBUGPY_ENABLED=1; \
+        export DEBUGPY_WAIT_FOR_CLIENT=0; \
+    fi; \
+    docker-compose -f docker-compose.dev.yml up superego-dev
+
+# Start production environment
+docker-prod action="up" profile="basic":
+    @echo "Managing production Docker environment..."
+    @if [ "{{action}}" = "up" ]; then \
+        echo "Starting production environment..."; \
+        echo "🏭 Production stack with profile: {{profile}}"; \
+        echo "🌐 Server: http://localhost (via nginx)"; \
+        echo "📊 Metrics: http://localhost/prometheus (monitoring profile)"; \
+        echo "📈 Grafana: http://localhost/grafana (monitoring profile)"; \
+        if [ "{{profile}}" = "basic" ]; then \
+            docker-compose -f docker-compose.yml up; \
+        elif [ "{{profile}}" = "monitoring" ]; then \
+            docker-compose -f docker-compose.yml --profile monitoring up; \
+        elif [ "{{profile}}" = "full" ]; then \
+            docker-compose -f docker-compose.yml --profile full up; \
+        else \
+            echo "Invalid profile: {{profile}}. Use: basic, monitoring, full"; \
+            exit 1; \
+        fi; \
+    elif [ "{{action}}" = "start" ]; then \
+        echo "Starting production environment in background ({{profile}} profile)..."; \
+        if [ "{{profile}}" = "basic" ]; then \
+            docker-compose -f docker-compose.yml up -d; \
+        elif [ "{{profile}}" = "monitoring" ]; then \
+            docker-compose -f docker-compose.yml --profile monitoring up -d; \
+        elif [ "{{profile}}" = "full" ]; then \
+            docker-compose -f docker-compose.yml --profile full up -d; \
+        fi; \
+        echo "✓ Production environment started ({{profile}} profile)"; \
+        echo "🌐 Server: http://localhost"; \
+        echo "📋 Logs: just docker-prod logs"; \
+    elif [ "{{action}}" = "stop" ]; then \
+        echo "Stopping production environment..."; \
+        docker-compose -f docker-compose.yml down; \
+        echo "✓ Production environment stopped"; \
+    elif [ "{{action}}" = "restart" ]; then \
+        echo "Restarting production environment..."; \
+        docker-compose -f docker-compose.yml restart; \
+        echo "✓ Production environment restarted"; \
+    elif [ "{{action}}" = "logs" ]; then \
+        echo "Showing production environment logs (Ctrl+C to exit)..."; \
+        docker-compose -f docker-compose.yml logs -f; \
+    elif [ "{{action}}" = "status" ]; then \
+        echo "Production environment status:"; \
+        docker-compose -f docker-compose.yml ps; \
+        echo ""; \
+        if docker-compose -f docker-compose.yml ps | grep -q "Up"; then \
+            echo "🌐 Server: http://localhost"; \
+            echo "🏥 Health check:"; \
+            curl -sf http://localhost/health > /dev/null 2>&1 && echo "✓ HTTP endpoint: PASSED" || echo "✗ HTTP endpoint: FAILED"; \
+        fi; \
+    else \
+        echo "Invalid action: {{action}}"; \
+        echo "Available actions: up, start, stop, restart, logs, status"; \
+        exit 1; \
+    fi
+
+# Clean up Docker containers, images, and volumes
+docker-clean target="all":
+    @echo "Cleaning up Docker resources for target: {{target}}"
+    @if [ "{{target}}" = "all" ] || [ "{{target}}" = "containers" ]; then \
+        echo "Stopping and removing containers..."; \
+        docker-compose -f docker-compose.yml down --remove-orphans 2>/dev/null || true; \
+        docker-compose -f docker-compose.dev.yml down --remove-orphans 2>/dev/null || true; \
+        echo "✓ Containers cleaned"; \
+    fi
+    @if [ "{{target}}" = "all" ] || [ "{{target}}" = "images" ]; then \
+        echo "Removing Superego MCP images..."; \
+        docker rmi superego-mcp:latest 2>/dev/null || true; \
+        docker rmi superego-mcp-dev:latest 2>/dev/null || true; \
+        docker rmi ghcr.io/toolprint/superego-mcp:latest 2>/dev/null || true; \
+        docker rmi ghcr.io/toolprint/superego-mcp-dev:latest 2>/dev/null || true; \
+        echo "✓ Images cleaned"; \
+    fi
+    @if [ "{{target}}" = "all" ] || [ "{{target}}" = "volumes" ]; then \
+        echo "Removing named volumes..."; \
+        docker volume rm superego-dev-logs 2>/dev/null || true; \
+        docker volume rm superego-dev-tmp 2>/dev/null || true; \
+        docker volume rm superego-dev-cache 2>/dev/null || true; \
+        echo "✓ Volumes cleaned"; \
+    fi
+    @if [ "{{target}}" = "all" ] || [ "{{target}}" = "system" ]; then \
+        echo "Running Docker system cleanup..."; \
+        docker system prune -f; \
+        echo "✓ System cleanup completed"; \
+    fi
+    @echo "🧹 Docker cleanup completed for {{target}}"
+
+# Run test suite in containerized environment
+container-test mode="basic":
+    @echo "Running tests in containerized environment..."
+    @if [ "{{mode}}" = "basic" ]; then \
+        echo "Starting development container for testing..."; \
+        docker-compose -f docker-compose.dev.yml up -d superego-dev; \
+        echo "Waiting for container to be ready..."; \
+        sleep 5; \
+        echo "Running test suite..."; \
+        docker-compose -f docker-compose.dev.yml exec -T superego-dev uv run pytest tests/ -v --tb=short; \
+        echo "Stopping container..."; \
+        docker-compose -f docker-compose.dev.yml down; \
+    elif [ "{{mode}}" = "coverage" ]; then \
+        echo "Running tests with coverage in container..."; \
+        docker-compose -f docker-compose.dev.yml up -d superego-dev; \
+        sleep 5; \
+        docker-compose -f docker-compose.dev.yml exec -T superego-dev uv run pytest tests/ --cov=superego_mcp --cov-report=html --cov-report=term-missing; \
+        echo "Coverage report available in htmlcov/"; \
+        docker-compose -f docker-compose.dev.yml down; \
+    elif [ "{{mode}}" = "watch" ]; then \
+        echo "Running tests with file watching (interactive mode)..."; \
+        echo "Container will stay running - use Ctrl+C to stop"; \
+        docker-compose -f docker-compose.dev.yml up -d superego-dev; \
+        sleep 5; \
+        docker-compose -f docker-compose.dev.yml exec superego-dev bash -c "uv run watchfiles 'uv run pytest tests/ -v --tb=short' src/ tests/"; \
+    elif [ "{{mode}}" = "performance" ]; then \
+        echo "Running performance tests in container..."; \
+        docker-compose -f docker-compose.dev.yml up -d superego-dev; \
+        sleep 5; \
+        docker-compose -f docker-compose.dev.yml exec -T superego-dev uv run pytest tests/test_performance_optimization.py -v; \
+        docker-compose -f docker-compose.dev.yml down; \
+    else \
+        echo "Invalid mode: {{mode}}"; \
+        echo "Available modes: basic, coverage, watch, performance"; \
+        exit 1; \
+    fi
+    @echo "✓ Container testing completed ({{mode}} mode)"
+
+# Production deployment automation
+deploy-production environment="staging" check="true":
+    @echo "🚀 Deploying to {{environment}} environment..."
+    @if [ "{{check}}" = "true" ]; then \
+        echo "Running pre-deployment checks..."; \
+        echo "1. Running quality checks..."; \
+        just check; \
+        echo "2. Building production image..."; \
+        just docker-build-prod; \
+        echo "3. Running security scan..."; \
+        docker buildx bake security-scan; \
+        echo "4. Testing production image..."; \
+        docker run --rm -d --name superego-deploy-test -p 8899:8000 superego-mcp:latest; \
+        sleep 10; \
+        curl -sf http://localhost:8899/health > /dev/null || (echo "Production image health check failed"; docker stop superego-deploy-test; exit 1); \
+        docker stop superego-deploy-test; \
+        echo "✓ Pre-deployment checks passed"; \
+    fi
+    @echo "Deploying with docker-compose ({{environment}} profile)..."
+    @if [ "{{environment}}" = "staging" ]; then \
+        export SUPEREGO_ENV=staging; \
+        export SUPEREGO_DEBUG=false; \
+        export SUPEREGO_LOG_LEVEL=info; \
+        docker-compose -f docker-compose.yml --profile monitoring up -d; \
+    elif [ "{{environment}}" = "production" ]; then \
+        export SUPEREGO_ENV=production; \
+        export SUPEREGO_DEBUG=false; \
+        export SUPEREGO_LOG_LEVEL=warning; \
+        docker-compose -f docker-compose.yml --profile full up -d; \
+    else \
+        echo "Invalid environment: {{environment}}. Use: staging, production"; \
+        exit 1; \
+    fi
+    @echo "✅ Deployment to {{environment}} completed successfully"
+    @echo "🌐 Server: http://localhost"
+    @echo "📊 Monitoring: http://localhost/grafana (admin/admin)"
+    @echo "📈 Metrics: http://localhost/prometheus"
+    @echo ""
+    @echo "Post-deployment verification:"
+    @echo "  Health: curl -sf http://localhost/health"
+    @echo "  Logs:   just docker-prod logs"
+    @echo "  Status: just docker-prod status"
+
+# Quick deployment without checks (for development)
+deploy-quick:
+    @echo "🚀 Quick deployment (skipping checks)..."
+    just deploy-production staging false
+
+# Rollback deployment (stop current, restart with previous image)
+deploy-rollback:
+    @echo "⏪ Rolling back deployment..."
+    @echo "Stopping current deployment..."
+    docker-compose -f docker-compose.yml down
+    @echo "Starting with previous configuration..."
+    docker-compose -f docker-compose.yml up -d
+    @echo "✓ Rollback completed"
+    @echo "Verify with: just docker-prod status"

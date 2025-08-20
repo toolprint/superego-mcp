@@ -1,0 +1,221 @@
+{
+  "name": "Superego MCP Development",
+  "dockerComposeFile": [
+    "../docker-compose.dev.yml",
+    "docker-compose.yml"
+  ],
+  "service": "superego-dev",
+  "workspaceFolder": "/app",
+  "shutdownAction": "stopCompose",
+
+  "forwardPorts": [
+    8002,
+    8003,
+    5679,
+    8082
+  ],
+  "portsAttributes": {
+    "8002": {
+      "label": "Superego Server",
+      "protocol": "http",
+      "onAutoForward": "notify"
+    },
+    "8003": {
+      "label": "Monitoring Dashboard", 
+      "protocol": "http",
+      "onAutoForward": "notify"
+    },
+    "5679": {
+      "label": "Python Debug Port",
+      "protocol": "tcp",
+      "onAutoForward": "silent"
+    },
+    "8082": {
+      "label": "Alt HTTP Server",
+      "protocol": "http", 
+      "onAutoForward": "silent"
+    }
+  },
+
+  "postCreateCommand": "/app/.devcontainer/entrypoint.sh",
+  "postStartCommand": "echo 'Superego MCP DevContainer ready! 🚀'",
+
+  "remoteUser": "appuser",
+  "containerUser": "appuser", 
+  "updateRemoteUserUID": false,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.flake8", 
+        "ms-python.mypy-type-checker",
+        "charliermarsh.ruff",
+        "ms-python.debugpy",
+        "ms-python.pytest",
+        "littlefoxteam.vscode-python-test-adapter",
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "github.vscode-pull-request-github",
+        "redhat.vscode-yaml",
+        "ms-vscode.vscode-json",
+        "ms-vscode.vscode-todo-highlight",
+        "streetsidesoftware.code-spell-checker",
+        "gruntfuggly.todo-tree",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-typescript-next",
+        "ms-vscode-remote.remote-ssh-edit"
+      ],
+      
+      "settings": {
+        "python.defaultInterpreterPath": "/app/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.typeCheckingMode": "strict",
+        "ruff.enable": true,
+        "ruff.lint.enable": true,
+        "ruff.format.enable": true,
+        "ruff.organizeImports": true,
+        "ruff.codeAction.disableRuleComment": {
+          "enable": true
+        },
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit",
+          "source.fixAll.ruff": "explicit"
+        },
+        "editor.rulers": [88],
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "files.associations": {
+          "*.yaml": "yaml",
+          "*.yml": "yaml",
+          "justfile": "makefile",
+          "Dockerfile*": "dockerfile",
+          "*.jinja2": "jinja"
+        },
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash",
+            "args": ["-l"],
+            "env": {
+              "PYTHONPATH": "/app/src"
+            }
+          }
+        },
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "tests",
+          "--verbose",
+          "--tb=short"
+        ],
+        "python.testing.autoTestDiscoverOnSaveEnabled": true,
+        "python.debugging.console": "integratedTerminal",
+        "git.autofetch": true,
+        "git.enableSmartCommit": true,
+        "git.confirmSync": false,
+        "explorer.fileNesting.enabled": true,
+        "explorer.fileNesting.expand": false,
+        "explorer.fileNesting.patterns": {
+          "*.py": "${capture}.pyi,${capture}.pyc",
+          "pyproject.toml": "uv.lock,requirements*.txt",
+          "docker-compose.yml": "docker-compose.*.yml,Dockerfile*",
+          "justfile": "*.just"
+        },
+        "files.watcherExclude": {
+          "**/.git/**": true,
+          "**/node_modules/**": true,
+          "**/__pycache__/**": true,
+          "**/htmlcov/**": true,
+          "**/dist/**": true,
+          "**/.cache/**": true,
+          "**/logs/**": true
+        },
+        "yaml.schemas": {
+          "https://json.schemastore.org/github-workflow.json": "/.github/workflows/*",
+          "/app/src/superego_mcp/schemas/rules-schema.json": [
+            "/app/config/rules*.yaml",
+            "/app/src/superego_mcp/config/rules*.yaml"
+          ]
+        },
+        "todohighlight.keywords": [
+          {
+            "text": "TODO:",
+            "color": "#ff6b6b",
+            "backgroundColor": "rgba(255, 107, 107, 0.1)"
+          },
+          {
+            "text": "FIXME:",
+            "color": "#ffa726",
+            "backgroundColor": "rgba(255, 167, 38, 0.1)"
+          },
+          {
+            "text": "NOTE:",
+            "color": "#42a5f5",
+            "backgroundColor": "rgba(66, 165, 245, 0.1)"
+          }
+        ]
+      }
+    }
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "installDirectlyFromGitHubRelease": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": false,
+      "installOhMyZsh": true,
+      "upgradePackages": true,
+      "username": "appuser",
+      "userUid": "1000",
+      "userGid": "1000"
+    }
+  },
+
+  "containerEnv": {
+    "PYTHONPATH": "/app/src",
+    "DEVELOPMENT": "1",
+    "LOG_LEVEL": "DEBUG",
+    "HOT_RELOAD": "1",
+    "SUPEREGO_CONFIG_PATH": "/app/config/server.yaml",
+    "SUPEREGO_RULES_PATH": "/app/config/rules.yaml",
+    "UV_CACHE_DIR": "/app/.cache/uv",
+    "DEBUGPY_ENABLED": "0"
+  },
+
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "8gb"
+  },
+
+  "initializeCommand": "echo 'Initializing Superego MCP DevContainer...'",
+  "onCreateCommand": [
+    "echo 'DevContainer created successfully'",
+    "uv --version",
+    "python --version"
+  ],
+  
+  "mounts": [
+    "source=superego-dev-cache,target=/app/.cache,type=volume",
+    "source=superego-dev-logs,target=/app/logs,type=volume",
+    "source=${localWorkspaceFolder}/.devcontainer/scripts,target=/app/.devcontainer/scripts,type=bind,consistency=cached"
+  ],
+
+  "waitFor": "postCreateCommand",
+  "overrideCommand": true,
+  "postAttachCommand": {
+    "server-status": "curl -sf http://localhost:8000/health || echo 'Server not ready yet'",
+    "dev-info": "echo 'Superego MCP Development Environment Ready!'; echo 'Server: http://localhost:8002'; echo 'Monitor: http://localhost:8003'; echo 'Debug: Port 5679'"
+  }
+}

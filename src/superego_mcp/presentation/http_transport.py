@@ -78,7 +78,7 @@ class HTTPTransport:
         self.app = FastAPI(
             title="Superego MCP Server",
             description="Security evaluation and policy enforcement API",
-            version="0.1.0",
+            version="0.0.0",
             docs_url="/docs",
             redoc_url="/redoc",
         )
@@ -412,7 +412,7 @@ class HTTPTransport:
             """
             return {
                 "name": "superego-mcp",
-                "version": "0.1.0",
+                "version": "0.0.0",
                 "description": "Intelligent tool request interception for AI agents",
                 "transport": "http",
                 "endpoints": {

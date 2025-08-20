@@ -1,0 +1,119 @@
+# Example rules demonstrating the new inference provider features
+
+rules:
+  # High-priority rule that always denies dangerous operations
+  - id: "deny-system-commands"
+    priority: 1
+    enabled: true
+    conditions:
+      tool_name: "bash"
+      parameters:
+        command:
+          type: "regex"
+          pattern: "(rm -rf|sudo|chmod|chown|passwd)"
+    action: "deny"
+    reason: "System commands with dangerous patterns are not allowed"
+
+  # Medium-priority rule using CLI provider for file operations
+  - id: "sample-file-operations"
+    priority: 10
+    enabled: true
+    conditions:
+      tool_name: "file_operations"
+    action: "sample"
+    reason: "File operations require AI evaluation"
+    inference_provider: "claude_cli"  # Force use of CLI provider for this rule
+    sampling_guidance: |
+      Evaluate this file operation request for security risks.
+      
+      Key considerations:
+      - Is the file path within safe user directories?
+      - Does the operation read/write sensitive files?
+      - Could this expose private data?
+      - Is the operation legitimate for the user's task?
+
+  # Rule using MCP sampling for network operations  
+  - id: "sample-network-operations"
+    priority: 15
+    enabled: true
+    conditions:
+      OR:
+        - tool_name: "http_request"
+        - tool_name: "api_call"
+        - tool_name: "curl"
+        - tool_name: "wget"
+    action: "sample"
+    reason: "Network operations require AI evaluation"
+    inference_provider: "mcp_sampling"  # Force use of MCP sampling for this rule
+    sampling_guidance: |
+      Evaluate this network operation for security and privacy concerns.
+      
+      Consider:
+      - Is the destination URL legitimate and safe?
+      - Could this leak sensitive information?
+      - Is the request method appropriate?
+      - Are authentication credentials being sent securely?
+
+  # Complex rule with compound conditions using default provider preference
+  - id: "sample-complex-operations"
+    priority: 20
+    enabled: true
+    conditions:
+      AND:
+        - tool_name:
+            type: "regex"
+            pattern: "(exec|eval|subprocess|shell)"
+        - parameters:
+            command:
+              type: "string"
+              pattern: "python"
+              case_sensitive: false
+    action: "sample"
+    reason: "Python execution requires careful evaluation"
+    # No inference_provider specified - will use default preference order
+    sampling_guidance: |
+      Evaluate this Python execution request.
+      
+      Security checks:
+      - Review the Python code for malicious operations
+      - Check for file system access patterns
+      - Look for network operations or data exfiltration
+      - Verify the code serves a legitimate purpose
+      - Assess potential for privilege escalation
+
+  # Time-based rule for development hours
+  - id: "allow-dev-tools-business-hours"
+    priority: 25
+    enabled: true
+    conditions:
+      AND:
+        - tool_name:
+            type: "regex"
+            pattern: "(git|npm|pip|docker|kubectl)"
+        - time_range:
+            start: "09:00"
+            end: "18:00"
+            timezone: "UTC"
+    action: "allow"
+    reason: "Development tools allowed during business hours"
+
+  # Default sampling rule for unmatched requests
+  - id: "default-sampling"
+    priority: 999
+    enabled: true
+    conditions:
+      tool_name:
+        type: "regex"
+        pattern: ".*"  # Match all tools
+    action: "sample"
+    reason: "All unmatched requests require AI evaluation"
+    sampling_guidance: |
+      This is a catch-all evaluation for tool requests not covered by specific rules.
+      
+      General security assessment:
+      - What is the tool trying to accomplish?
+      - Are there any obvious security concerns?
+      - Is this a legitimate use case?
+      - Could this operation cause harm or expose data?
+      
+      Default to allowing low-risk operations and denying anything suspicious.

@@ -1,0 +1,38 @@
+# Grafana Dashboard Provisioning Configuration
+# Automatically load Superego MCP monitoring dashboards
+
+apiVersion: 1
+
+providers:
+  # Main dashboards folder
+  - name: 'superego-dashboards'
+    orgId: 1
+    folder: 'Superego MCP'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/superego
+      
+  # System dashboards folder  
+  - name: 'system-dashboards'
+    orgId: 1
+    folder: 'System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/system
+
+  # Default dashboards (in root)
+  - name: 'default-dashboards'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/default

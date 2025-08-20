@@ -1,0 +1,48 @@
+# Grafana Datasource Configuration for Superego MCP Monitoring
+# Automated provisioning of Prometheus and Loki datasources
+
+apiVersion: 1
+
+datasources:
+  # Primary Prometheus datasource
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    uid: prometheus
+    editable: true
+    jsonData:
+      httpMethod: POST
+      prometheusType: Prometheus
+      prometheusVersion: 2.48.0
+      cacheLevel: 'High'
+      disableMetricsLookup: false
+      customQueryParameters: ''
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+      queryTimeout: 60s
+    secureJsonData: {}
+
+  # Loki datasource for logs (when logging profile is enabled)
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    editable: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        - datasourceUid: prometheus
+          matcherRegex: "level=error.*trace_id=(\\w+)"
+          name: TraceID
+          url: "/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22prometheus%22,%7B%22expr%22:%22trace_id%3D%5C%22$${__value.raw}%5C%22%22%7D%5D"
+    secureJsonData: {}
+
+  # TestData datasource for development/testing
+  - name: TestData
+    type: testdata
+    uid: testdata
+    editable: false
+    jsonData: {}

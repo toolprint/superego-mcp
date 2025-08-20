@@ -1,0 +1,282 @@
+# Production Security Configuration for Superego MCP Server
+# This configuration prioritizes security, performance, and reliability
+# Environment variables will override these settings
+
+server:
+  # Network configuration
+  host: "0.0.0.0"
+  port: 8000
+  
+  # Security settings
+  api_key_required: true
+  api_key_header: "X-Superego-API-Key"
+  
+  # CORS policy (restrictive by default)
+  cors:
+    enabled: true
+    origins: []  # Configure via environment variable
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    headers: ["Content-Type", "Authorization", "X-Superego-API-Key"]
+    credentials: false
+  
+  # Request handling
+  max_request_size: 1048576  # 1MB limit
+  request_timeout: 60
+  keepalive_timeout: 5
+  
+  # Security headers
+  security_headers:
+    enabled: true
+    headers:
+      X-Content-Type-Options: "nosniff"
+      X-Frame-Options: "DENY"
+      X-XSS-Protection: "1; mode=block"
+      Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+      Content-Security-Policy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+
+# Logging configuration
+logging:
+  level: "info"
+  format: "json"  # Structured logging for production
+  file: "/app/logs/superego.log"
+  max_size: "100MB"
+  max_files: 5
+  
+  # Audit logging
+  audit:
+    enabled: true
+    file: "/app/logs/audit.log"
+    include_request_body: false  # Security: don't log sensitive data
+    include_response_body: false
+    
+  # Security logging
+  security:
+    enabled: true
+    file: "/app/logs/security.log"
+    log_failed_auth: true
+    log_rate_limits: true
+
+# Security policy configuration
+security:
+  enabled: true
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+    burst_size: 10
+    storage: "redis://redis:6379/1"
+    
+    # Rate limit by IP and API key
+    key_func: "ip_and_api_key"
+    
+    # Custom rate limits for different endpoints
+    endpoints:
+      "/health":
+        requests_per_minute: 300  # Health checks can be more frequent
+      "/metrics":
+        requests_per_minute: 60   # Monitoring systems need regular access
+      "/advise":
+        requests_per_minute: 30   # AI inference is resource-intensive
+  
+  # Authentication configuration
+  auth:
+    api_key:
+      enabled: true
+      required_for_all_endpoints: true
+      exclude_endpoints: ["/health", "/metrics"]  # Public endpoints
+    
+    # API key validation
+    key_validation:
+      min_length: 32
+      require_alphanumeric: true
+  
+  # Input validation
+  input_validation:
+    enabled: true
+    max_json_depth: 10
+    max_string_length: 10000
+    max_array_length: 1000
+    
+    # Sanitization
+    sanitize_html: true
+    strip_control_characters: true
+
+# AI service configuration  
+ai:
+  provider: "anthropic"
+  model: "claude-3-haiku-20240307"
+  
+  # Security settings
+  timeout: 30
+  max_retries: 3
+  max_tokens: 4000
+  
+  # Circuit breaker for resilience
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    recovery_timeout: 300
+    timeout: 60
+  
+  # Request validation
+  request_validation:
+    enabled: true
+    max_prompt_length: 50000
+    blocked_patterns:
+      - "password"
+      - "secret"
+      - "api_key"
+      - "token"
+  
+  # Response filtering
+  response_filtering:
+    enabled: true
+    remove_sensitive_data: true
+    max_response_length: 100000
+
+# Performance configuration
+performance:
+  # Worker configuration
+  workers: 1
+  max_requests: 1000
+  max_requests_jitter: 50
+  
+  # Connection pooling
+  connection_pool:
+    max_size: 10
+    min_size: 2
+    timeout: 30
+  
+  # Caching
+  cache:
+    enabled: true
+    ttl: 3600  # 1 hour
+    max_size: 1000
+    storage: "redis://redis:6379/0"
+  
+  # Request queue
+  queue:
+    enabled: true
+    max_size: 100
+    timeout: 30
+
+# Monitoring and observability
+monitoring:
+  enabled: true
+  
+  # Metrics
+  metrics:
+    enabled: true
+    path: "/metrics"
+    include_labels: ["method", "endpoint", "status_code"]
+    
+    # Custom metrics
+    custom:
+      request_duration_histogram: true
+      active_connections_gauge: true
+      error_rate_counter: true
+  
+  # Health checks
+  health:
+    enabled: true
+    path: "/health"
+    timeout: 10
+    
+    # Health check components
+    checks:
+      - name: "database"
+        type: "redis"
+        url: "redis://redis:6379/0"
+      - name: "ai_service"
+        type: "http"
+        url: "https://api.anthropic.com"
+        timeout: 5
+  
+  # Tracing (disabled by default for performance)
+  tracing:
+    enabled: false
+    service_name: "superego-mcp"
+    endpoint: ""
+
+# Data retention and cleanup
+data_retention:
+  # Log retention
+  logs:
+    max_age_days: 30
+    max_size_mb: 1000
+  
+  # Cache cleanup
+  cache:
+    cleanup_interval: 3600  # 1 hour
+    max_memory_usage: 0.8   # 80% of available memory
+  
+  # Audit data
+  audit:
+    max_age_days: 90
+    compression_enabled: true
+
+# Feature flags for production
+features:
+  debug_mode: false
+  hot_reload: false
+  development_endpoints: false
+  detailed_errors: false  # Don't expose internal errors
+  
+  # Security features
+  request_id_generation: true
+  correlation_id_propagation: true
+  sensitive_data_masking: true
+
+# Rules and policy configuration
+rules:
+  # Rule processing
+  processing:
+    timeout: 10
+    max_rules_per_request: 100
+    parallel_processing: true
+  
+  # Rule validation
+  validation:
+    enabled: true
+    strict_mode: true
+    validate_on_load: true
+  
+  # Rule caching
+  caching:
+    enabled: true
+    ttl: 1800  # 30 minutes
+    invalidate_on_change: true
+
+# Integration settings
+integrations:
+  # Webhook configuration (if enabled)
+  webhooks:
+    enabled: false
+    timeout: 10
+    max_retries: 3
+    
+  # External services
+  external_services:
+    timeout: 30
+    circuit_breaker_enabled: true
+
+# Environment-specific overrides
+# These will be overridden by environment variables
+environment_overrides:
+  # Development overrides (not used in production)
+  development:
+    logging.level: "debug"
+    features.debug_mode: true
+    
+  # Staging overrides
+  staging:
+    logging.level: "debug"
+    monitoring.tracing.enabled: true
+    
+  # Production overrides (current environment)
+  production:
+    logging.level: "info"
+    features.debug_mode: false
+    security.rate_limit.enabled: true

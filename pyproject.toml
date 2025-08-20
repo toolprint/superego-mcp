@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "superego-mcp"
-version = "0.0.0"
+dynamic = ["version"]
 description = "Intelligent tool-call review system for AI agents"
 requires-python = ">=3.11"
 readme = "README.md"
@@ -41,21 +41,23 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastmcp>=2.0.0",           # MCP server framework with sampling support
-    "pydantic>=2.0.0",          # Data validation and domain models
-    "pyyaml>=6.0",              # Configuration file parsing
-    "watchfiles>=0.20.0",       # File system monitoring for hot-reload
-    "jinja2>=3.1.0",            # Secure prompt templating
-    "httpx>=0.25.0",            # HTTP client for AI services
-    "structlog>=23.0.0",        # Structured logging
-    "psutil>=5.9.0",            # System metrics for health checks
-    "fastapi>=0.104.0",         # FastAPI for HTTP and WebSocket transports
+    "fastmcp>=2.0.0", # MCP server framework with sampling support
+    "pydantic>=2.0.0", # Data validation and domain models
+    "pyyaml>=6.0", # Configuration file parsing
+    "watchfiles>=0.20.0", # File system monitoring for hot-reload
+    "jinja2>=3.1.0", # Secure prompt templating
+    "httpx>=0.25.0", # HTTP client for AI services
+    "structlog>=23.0.0", # Structured logging
+    "psutil>=5.9.0", # System metrics for health checks
+    "fastapi>=0.104.0", # FastAPI for HTTP and WebSocket transports
     "uvicorn[standard]>=0.24.0", # ASGI server for FastAPI
-    "jsonpath-ng>=1.6.0",      # JSONPath expression support
-    "python-dateutil>=2.8.0",   # Time-based rule evaluation
+    "jsonpath-ng>=1.6.0", # JSONPath expression support
+    "python-dateutil>=2.8.0", # Time-based rule evaluation
     "prometheus-client>=0.19.0", # Prometheus metrics export
-    "aiohttp>=3.9.0",           # HTTP server for monitoring dashboard
-    "aiohttp-sse>=2.1.0",       # Server-sent events for real-time metrics
+    "aiohttp>=3.9.0", # HTTP server for monitoring dashboard
+    "aiohttp-sse>=2.1.0", # Server-sent events for real-time metrics
+    "docker>=7.1.0",
+    "requests>=2.32.4",
 ]
 
 [project.optional-dependencies]
@@ -117,6 +119,15 @@ dev = [
     "types-python-dateutil>=2.9.0.20250809",
 ]
 
+# Container testing dependencies
+container-test = [
+    "docker>=7.0.0",           # Docker Python API for container management
+    "requests>=2.31.0",        # HTTP client for container API testing
+    "pytest>=7.4.0",           # Testing framework
+    "pytest-asyncio>=0.21.0",  # Async test support
+    "pytest-timeout>=2.1.0",   # Test timeout handling
+]
+
 [project.scripts]
 # Unified CLI interface (primary)
 superego = "superego_mcp.cli:main"
@@ -137,9 +148,136 @@ Changelog = "https://github.com/toolprint/superego-mcp/releases"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/superego_mcp"]
+# Include all runtime assets and configuration files in the wheel
+include = [
+    # Core Python package
+    "src/superego_mcp/**/*.py",
+    
+    # Configuration files
+    "src/superego_mcp/**/*.yaml", 
+    "src/superego_mcp/**/*.yml",
+    "src/superego_mcp/**/*.json",
+    
+    # Static assets (CSS, JS, HTML, images)
+    "src/superego_mcp/**/*.css",
+    "src/superego_mcp/**/*.js", 
+    "src/superego_mcp/**/*.html",
+    "src/superego_mcp/**/*.png",
+    "src/superego_mcp/**/*.svg",
+    "src/superego_mcp/**/*.ico",
+    
+    # Template files
+    "src/superego_mcp/**/*.jinja2",
+    "src/superego_mcp/**/*.j2",
+    
+    # Compressed assets
+    "src/superego_mcp/**/*.gz",
+    
+    # Build metadata and checksums
+    "src/superego_mcp/_build_metadata.json",
+    "src/superego_mcp/_asset_checksums.json",
+    
+    # External configuration files (copied by build hooks)
+    "config/*.yaml",
+    "config/*.yml",
+    "demo/config/**/*.yaml",
+    "demo/config/**/*.yml",
+    "demo/config/**/*.json",
+]
+# Exclude unnecessary files from wheel
+exclude = [
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "tests/**",
+    "htmlcov/**",
+    "dist/**",
+    "build/**",
+    "*.egg-info/**",
+    
+    # Exclude temporary build files
+    "**/*.tmp",
+    "**/*.bak",
+    "**/.gitkeep",
+]
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+# Custom build hook configuration for asset management
+dependencies = [
+    "pyyaml>=6.0",  # For configuration validation
+]
+# Hook runs for all build targets
+require-runtime-dependencies = false
+
+[tool.hatch.build.targets.sdist]
+# Include all source files and assets in source distribution
+include = [
+    # Source code and package files
+    "src/**",
+    
+    # Configuration and asset directories
+    "config/**", 
+    "demo/config/**",
+    "static/**",
+    "templates/**",
+    
+    # Test files for development
+    "tests/**",
+    
+    # Documentation and project files
+    "README.md",
+    "pyproject.toml",
+    "hatch_build.py",
+    "justfile",
+    "uv.lock",
+    
+    # License and changelog
+    "LICENSE*",
+    "CHANGELOG*",
+    "HISTORY*",
+]
+exclude = [
+    # Build artifacts
+    "**/__pycache__/**",
+    "**/*.pyc", 
+    "**/*.pyo",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "dist/**",
+    "build/**",
+    "htmlcov/**",
+    "*.egg-info/**",
+    
+    # Temporary and generated files
+    "build_report.json",
+    "src/superego_mcp/_build_metadata.json",
+    "src/superego_mcp/_asset_checksums.json",
+    "**/*.tmp",
+    "**/*.bak",
+    
+    # IDE and editor files
+    ".vscode/**",
+    ".idea/**",
+    "**/*.swp",
+    "**/*.swo",
+    "**/*~",
+]
 
 [tool.hatch.version]
 path = "src/superego_mcp/__init__.py"
+
+# Build configuration for asset management
+[tool.hatch.build]
+# Skip VCS ignore patterns for asset inclusion
+skip-excluded-dirs = true
+
+# Force include build metadata files
+[tool.hatch.build.force-include]
+"src/superego_mcp/_build_metadata.json" = "superego_mcp/_build_metadata.json"
+"src/superego_mcp/_asset_checksums.json" = "superego_mcp/_asset_checksums.json"
 
 [tool.ruff]
 target-version = "py311"
@@ -206,6 +344,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
+    "performance: marks tests as performance benchmarks",
 ]
 
 [tool.coverage.run]
