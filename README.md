@@ -370,9 +370,33 @@ superego mcp --debug
 
 MIT License - see [LICENSE](LICENSE) file for details
 
+## Container Deployment
+
+### Docker Quickstart
+
+1. Pull the latest image:
+```bash
+docker pull toolprint/superego-mcp:latest
+```
+
+2. Run with Docker Compose:
+```bash
+# Start in development mode
+docker-compose up -d
+
+# Start in production mode
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Container Management
+- Comprehensive container usage guide: [Container Usage Docs](/docs/container-usage.md)
+- Deployment guide: [Deployment Guide](/docs/deployment-guide.md)
+- Troubleshooting: [Troubleshooting Guide](/docs/troubleshooting.md)
+
 ## Links
 
 - [Repository](https://github.com/toolprint/superego-mcp)
 - [Issues](https://github.com/toolprint/superego-mcp/issues)
 - [PyPI Package](https://pypi.org/project/superego-mcp/)
-- [Documentation](https://github.com/toolprint/superego-mcp/tree/main/docs)
+- [Documentation](/docs)
+- [Container Documentation](/docs/container-usage.md)
