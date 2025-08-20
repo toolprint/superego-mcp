@@ -359,6 +359,33 @@ class UnifiedServer:
                     reason=f"Evaluation error: {str(e)}",
                 )
 
+        @self.fastapi.get("/")
+        async def root():
+            """Root endpoint with API information."""
+            return {
+                "service": "Superego MCP Server",
+                "version": "0.0.0",
+                "status": "running",
+                "endpoints": {
+                    "health": "/v1/health",
+                    "evaluate": "/v1/evaluate",
+                    "hooks": "/v1/hooks",
+                    "metrics": "/v1/metrics",
+                    "server_info": "/v1/server-info",
+                    "rules": "/v1/config/rules",
+                    "audit": "/v1/audit",
+                },
+                "transports": ["HTTP", "STDIO", "SSE"],
+                "docs": "/docs",
+            }
+
+        @self.fastapi.get("/health")
+        async def health_redirect():
+            """Redirect /health to /v1/health for compatibility."""
+            from fastapi.responses import RedirectResponse
+
+            return RedirectResponse(url="/v1/health", status_code=301)
+
         @self.fastapi.get("/v1/health", response_model=HealthResponse)
         async def health_check_http() -> HealthResponse:
             """Check the health of the Superego service (HTTP).
@@ -701,6 +728,7 @@ class UnifiedServer:
             host=host,
             port=port,
             log_config=None,  # Use structlog instead
+            access_log=False,  # Disable access logging to prevent I/O errors
         )
 
         # Create and store server

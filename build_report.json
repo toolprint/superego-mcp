@@ -1,12 +1,12 @@
 {
-  "artifact_name": "superego_mcp-0.0.0-py3-none-any.whl",
-  "artifact_size_bytes": 7108,
-  "artifact_size_kb": 6.94,
+  "artifact_name": "superego_mcp-0.0.0.tar.gz",
+  "artifact_size_bytes": 386290,
+  "artifact_size_kb": 377.24,
   "build_branch": "feat/python-mcp-docker",
-  "build_commit": "744804b2cb7ab03d7236f6dba47a88d4f334cf56",
+  "build_commit": "a77874a6e6e126099a7e05b1bc1021759bdc8ffd",
   "build_platform": "darwin",
-  "build_timestamp": "2025-08-20T08:03:57.857673Z",
+  "build_timestamp": "2025-08-20T19:35:16.180014Z",
   "package_name": "superego-mcp",
   "python_version": "3.13.5",
-  "version": "editable"
+  "version": "standard"
 }
