@@ -6,19 +6,19 @@ the Superego MCP Server using the Cyclopts framework.
 """
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Annotated, Optional
 
 import cyclopts
 
-# Import placeholder command functions (to be implemented in tasks 151-152)
-# These imports will be added once the command modules are created
-# from .commands.evaluate import evaluate_command
-# from .commands.hooks import hooks_command  
-# from .commands.health import health_command
-# from .commands.load import load_command
-# from .commands.interactive import interactive_command
-# from .commands.scenarios import scenarios_command
+# Import command functions from implemented modules
+from .commands.evaluate import run_evaluation
+from .commands.hooks import run_hook_test
+from .commands.health import run_health_check
+from .commands.load import run_load_test
+from .commands.interactive import run_interactive_mode
+from .commands.scenarios import manage_scenarios
 
 # Main Cyclopts Application
 app = cyclopts.App(
@@ -73,18 +73,25 @@ def evaluate(
     This command allows testing of security policies by evaluating text prompts
     or tool requests against configured rule sets to see what decisions would be made.
     """
-    # Implementation will be added in evaluate command module
-    async def _evaluate() -> None:
-        # Placeholder - will import and call evaluate_command function
-        print("Evaluate command - implementation pending (Task 151)")
-        print(f"Config: {config}")
-        print(f"Rules: {rules}")
-        print(f"Prompt: {prompt}")
-        print(f"Input file: {input_file}")
-        print(f"Output format: {output_format}")
-        print(f"Verbose: {verbose}")
+    # Convert parameters to match run_evaluation function signature
+    scenario_file = input_file
+    parameters_json = None
+    tool_name_param = None
     
-    asyncio.run(_evaluate())
+    # If prompt is provided, treat it as a simple tool evaluation
+    if prompt and not input_file:
+        tool_name_param = "prompt_evaluation"
+        parameters_json = json.dumps({"prompt": prompt})
+    
+    asyncio.run(run_evaluation(
+        scenario_file=scenario_file,
+        tool_name=tool_name_param,
+        parameters_json=parameters_json,
+        config_file=config,
+        output_format=output_format,
+        parallel=False,  # Default to sequential execution
+        tags_filter=None
+    ))
 
 
 @app.command
@@ -120,16 +127,16 @@ def hooks(
     Install, configure, and test hooks that integrate Superego MCP Server
     with Claude Code for real-time tool request filtering and security.
     """
-    # Implementation will be added in hooks command module
-    async def _hooks() -> None:
-        # Placeholder - will import and call hooks_command function
-        print("Hooks command - implementation pending (Task 152)")
-        print(f"Action: {action}")
-        print(f"Config: {config}")
-        print(f"Target: {target}")
-        print(f"Dry run: {dry_run}")
-    
-    asyncio.run(_hooks())
+    asyncio.run(run_hook_test(
+        action=action,
+        scenario_file=None,  # Could be extended to support config-based scenarios
+        event_name=None,
+        tool_name=None,
+        arguments_json=None,
+        config_file=config,
+        output_format="pretty",
+        integration_test=(action == "test")  # Run integration tests for "test" action
+    ))
 
 
 @app.command
@@ -171,17 +178,15 @@ def health(
     Performs health checks against a running server instance to verify
     that all components are functioning correctly.
     """
-    # Implementation will be added in health command module
-    async def _health() -> None:
-        # Placeholder - will import and call health_command function
-        print("Health command - implementation pending (Task 151)")
-        print(f"Server URL: {server_url}")
-        print(f"Timeout: {timeout}")
-        print(f"Detailed: {detailed}")
-        print(f"Watch: {watch}")
-        print(f"Interval: {interval}")
-    
-    asyncio.run(_health())
+    asyncio.run(run_health_check(
+        server_url=server_url,
+        config_file=None,  # Use default config
+        detailed=detailed,
+        watch=watch,
+        interval=interval,
+        output_format="pretty",
+        timeout=timeout
+    ))
 
 
 @app.command
@@ -235,17 +240,17 @@ def load(
     Generates configurable load patterns to test server performance,
     scalability, and stability under various traffic conditions.
     """
-    # Implementation will be added in load command module
+    # Call the implemented load testing function
     async def _load() -> None:
-        # Placeholder - will import and call load_command function
-        print("Load command - implementation pending (Task 152)")
-        print(f"Target URL: {target_url}")
-        print(f"Requests: {requests}")
-        print(f"Concurrency: {concurrency}")
-        print(f"Duration: {duration}")
-        print(f"Ramp up: {ramp_up}")
-        print(f"Scenario: {scenario}")
-        print(f"Output file: {output_file}")
+        await run_load_test(
+            target_url=target_url,
+            requests=requests,
+            concurrency=concurrency,
+            duration=duration,
+            ramp_up=ramp_up,
+            scenario=scenario,
+            output_file=output_file,
+        )
     
     asyncio.run(_load())
 
@@ -283,14 +288,14 @@ def interactive(
     Provides a REPL-like interface for testing tool requests, exploring
     rule behavior, and debugging security policies in real-time.
     """
-    # Implementation will be added in interactive command module
+    # Call the implemented interactive mode function
     async def _interactive() -> None:
-        # Placeholder - will import and call interactive_command function
-        print("Interactive command - implementation pending (Task 151)")
-        print(f"Config: {config}")
-        print(f"Server URL: {server_url}")
-        print(f"Auto approve: {auto_approve}")
-        print(f"Log level: {log_level}")
+        await run_interactive_mode(
+            config=config,
+            server_url=server_url,
+            auto_approve=auto_approve,
+            log_level=log_level,
+        )
     
     asyncio.run(_interactive())
 
@@ -340,16 +345,16 @@ def scenarios(
     Executes comprehensive test suites covering security policies,
     performance benchmarks, and integration testing scenarios.
     """
-    # Implementation will be added in scenarios command module
+    # Call the implemented scenario management function
     async def _scenarios() -> None:
-        # Placeholder - will import and call scenarios_command function
-        print("Scenarios command - implementation pending (Task 152)")
-        print(f"Scenario name: {scenario_name}")
-        print(f"Config dir: {config_dir}")
-        print(f"Output format: {output_format}")
-        print(f"Parallel: {parallel}")
-        print(f"Fail fast: {fail_fast}")
-        print(f"Tags: {tags}")
+        await manage_scenarios(
+            scenario_name=scenario_name,
+            config_dir=config_dir,
+            output_format=output_format,
+            parallel=parallel,
+            fail_fast=fail_fast,
+            tags=tags,
+        )
     
     asyncio.run(_scenarios())
 
