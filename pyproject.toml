@@ -128,6 +128,15 @@ container-test = [
     "pytest-timeout>=2.1.0",   # Test timeout handling
 ]
 
+# Test harness dependencies
+test-harness = [
+    "cyclopts>=2.0.0",         # CLI framework for test commands
+    "httpx>=0.25.0",          # HTTP client for API testing
+    "rich>=13.0.0",           # Rich terminal output
+    "pydantic>=2.0.0",        # Data validation
+    "tomli>=2.0.0",           # TOML parsing
+]
+
 [project.scripts]
 # Unified CLI interface (primary)
 superego = "superego_mcp.cli:main"
