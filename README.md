@@ -69,7 +69,7 @@ Superego provides seamless integration with Claude Code through hooks:
 ### Setup Claude Code Hooks
 
 ```bash
-# Add hooks for specific tools
+# Add hooks for specific tools (recommended)
 superego hooks add --matcher "Bash|Write|Edit|MultiEdit"
 
 # Add universal hook for all tools
@@ -79,9 +79,10 @@ superego hooks add --matcher "*"
 superego hooks add --matcher "*" --url http://localhost:8000
 ```
 
-### Direct Hook Configuration
+**For complete hook setup instructions and examples, see: [Claude Code Hooks Setup Guide](docs/claude-code-hooks-setup.md)**
 
-Add to your Claude Code configuration:
+### Quick Hook Configuration
+
 ```json
 {
   "hooks": {
@@ -92,7 +93,7 @@ Add to your Claude Code configuration:
           {
             "type": "command",
             "command": "superego advise",
-            "args": ["-c", "~/.toolprint/superego/config.yaml"]
+            "timeout": 5000
           }
         ]
       }

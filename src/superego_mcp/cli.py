@@ -95,41 +95,13 @@ Examples:
   superego hooks add --matcher "Bash|Write|Edit" --url http://localhost:8000
   superego hooks add --matcher "*" --url https://superego.company.com --token <auth-token>
 
-Claude Code Hook Integration:
-  # Add as a direct hook command:
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "superego advise",
-            "timeout": 5000
-          }
-        ]
-      }
-    ]
-  }
+For detailed Claude Code hook configuration examples, see:
+docs/claude-code-hooks-setup.md
 
-  # Or use with HTTP server:
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "curl --json @- http://localhost:8000/pretoolinputendpoint",
-            "timeout": 5000
-          }
-        ]
-      }
-    ]
-  }
+Quick setup: superego hooks add
+Centralized mode: superego hooks add --url http://localhost:8000
 
-For more information on Claude Code hooks, see:
-https://docs.anthropic.com/en/docs/claude-code/hooks-guide
+More info: https://docs.anthropic.com/en/docs/claude-code/hooks-guide
         """,
     )
 

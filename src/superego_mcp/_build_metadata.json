@@ -15,9 +15,9 @@
     "total_size_kb": 41.15
   },
   "build_branch": "feat/python-mcp-docker",
-  "build_commit": "88e981af1383c45421e38217767ebb458111baea",
+  "build_commit": "e0fcc83abd3d48219a5c013364ab92133e58475f",
   "build_platform": "darwin",
-  "build_timestamp": "2025-08-21T03:16:22.728458Z",
+  "build_timestamp": "2025-08-21T03:39:01.951253Z",
   "build_version": "standard",
   "hatchling_version": "unknown",
   "python_version": "3.13.5"
