@@ -53,9 +53,8 @@ async def async_main(transport: str | None = None, port: int | None = None) -> N
     config_manager = ConfigManager()
     config = config_manager.load_config()
 
-    # Initialize configuration paths
-    config_dir = Path("config")
-    rules_file = config_dir / "rules.yaml"
+    # Initialize configuration paths from loaded config
+    rules_file = Path(config.rules_file)
 
     # Create components
     error_handler = ErrorHandler()

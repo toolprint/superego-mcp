@@ -8,7 +8,7 @@ set -e
 SUPEREGO_HOST="${SUPEREGO_HOST:-0.0.0.0}"
 SUPEREGO_PORT="${SUPEREGO_PORT:-8000}"
 SUPEREGO_LOG_LEVEL="${SUPEREGO_LOG_LEVEL:-info}"
-SUPEREGO_CONFIG_PATH="${SUPEREGO_CONFIG_PATH:-/app/data/config.yaml}"
+SUPEREGO_CONFIG_PATH="${SUPEREGO_CONFIG_PATH:-/app/data/server.yaml}"
 
 # Process ID for the main application
 APP_PID=""
