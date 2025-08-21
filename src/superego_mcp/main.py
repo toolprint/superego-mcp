@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 from pathlib import Path
@@ -20,8 +21,18 @@ from .infrastructure.prompt_builder import SecurePromptBuilder
 
 def main() -> None:
     """Main application bootstrap with hot-reload support"""
-    # Setup logging
-    logging.basicConfig(level=logging.INFO)
+    # Configure logging using explicit environment variables
+    log_format = os.getenv("SUPEREGO_LOG_FORMAT", "console")  # console|json
+    log_handler = os.getenv("SUPEREGO_LOG_HANDLER", "print")  # print|write
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    
+    from .infrastructure.logging_config import configure_logging_explicit
+    configure_logging_explicit(
+        log_format=log_format,
+        log_handler=log_handler,
+        level=log_level,
+        stream=sys.stderr  # Always use stderr to avoid conflicts with STDIO transport
+    )
 
     # Run the async main function
     try:
@@ -36,16 +47,7 @@ def main() -> None:
 
 async def async_main(transport: str | None = None, port: int | None = None) -> None:
     """Async main function with lifecycle management"""
-    # Configure logging based on transport type
-    if transport == "stdio":
-        from .infrastructure.logging_config import configure_stderr_logging
-
-        configure_stderr_logging(level="INFO", json_logs=False)
-    else:
-        # For http or default, use standard logging
-        from .infrastructure.logging_config import configure_logging
-
-        configure_logging(level="INFO", json_logs=False)
+    # Logging is now configured in main() function using environment variables
 
     # Load configuration
     config_manager = ConfigManager()

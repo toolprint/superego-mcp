@@ -63,6 +63,10 @@ services:
       - SUPEREGO_RATE_LIMIT_ENABLED=${SUPEREGO_RATE_LIMIT_ENABLED:-true}
       - SUPEREGO_RATE_LIMIT_REQUESTS=${SUPEREGO_RATE_LIMIT_REQUESTS:-100}
       - SUPEREGO_RATE_LIMIT_WINDOW=${SUPEREGO_RATE_LIMIT_WINDOW:-60}
+      
+      # Explicit logging configuration for production Docker
+      - SUPEREGO_LOG_FORMAT=json     # JSON structured logs for production
+      - SUPEREGO_LOG_HANDLER=write   # WriteLogger for Docker containers (prevents I/O errors)
     
     # Volume mounts for persistent data and configuration
     volumes:

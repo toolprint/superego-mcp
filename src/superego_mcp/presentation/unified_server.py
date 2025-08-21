@@ -16,6 +16,7 @@ import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
+import datetime as dt
 from typing import Any
 
 import structlog
@@ -397,7 +398,7 @@ class UnifiedServer:
                 health_data = await self._health_check_internal()
                 return HealthResponse(
                     status=health_data.get("status", "unknown"),
-                    timestamp=health_data.get("timestamp", str(datetime.utcnow())),
+                    timestamp=health_data.get("timestamp", datetime.now(dt.UTC).isoformat()),
                     components=health_data.get("components", {}),
                 )
             except Exception as e:
@@ -576,13 +577,18 @@ class UnifiedServer:
         """Internal health check logic shared between protocols."""
         try:
             health_status = await self.health_monitor.check_health()
-            return health_status.model_dump()
+            # Use model_dump with mode='json' to properly serialize datetime objects
+            health_data = health_status.model_dump(mode='json')
+            # Ensure timestamp is a string if it's not already
+            if isinstance(health_data.get('timestamp'), datetime):
+                health_data['timestamp'] = health_data['timestamp'].isoformat()
+            return health_data
         except Exception as e:
             logger.error("Health check failed", error=str(e))
             return {
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": str(datetime.utcnow()),
+                "timestamp": datetime.now(dt.UTC).isoformat(),
             }
 
     async def _server_info_internal(self) -> dict[str, Any]:
