@@ -24,7 +24,7 @@ services:
       - SUPEREGO_HOST=0.0.0.0
       - SUPEREGO_PORT=8000
       - SUPEREGO_LOG_LEVEL=${SUPEREGO_LOG_LEVEL:-info}
-      - SUPEREGO_CONFIG_PATH=/app/data/server.yaml
+      - SUPEREGO_CONFIG_PATH=/app/config/server.yaml
       
       # Security and performance
       - PYTHONUNBUFFERED=1
@@ -73,13 +73,9 @@ services:
     
     # Volume mounts for persistent data and configuration
     volumes:
-      # Configuration and rules
-      - superego-config:/app/data
+      # Configuration directory - unified with development
+      - ./config:/app/config:ro
       - superego-logs:/app/logs
-      
-      # Optional: Custom configuration override
-      - ${SUPEREGO_CONFIG_FILE:-./config/server.yaml}:/app/data/server.yaml:ro
-      - ${SUPEREGO_RULES_FILE:-./config/rules.yaml}:/app/data/rules.yaml:ro
       
       # Optional: Custom TLS certificates
       - ${SUPEREGO_TLS_CERT:-/dev/null}:/app/certs/server.crt:ro
@@ -479,7 +475,7 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: ${PWD}/data/config
+      device: ${PWD}/config
       o: bind
   superego-logs:
     driver: local

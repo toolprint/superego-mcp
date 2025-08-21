@@ -1,7 +1,6 @@
 """Main entry point for Superego MCP Server."""
 
 import asyncio
-import logging
 import os
 import signal
 import sys
@@ -25,13 +24,14 @@ def main() -> None:
     log_format = os.getenv("SUPEREGO_LOG_FORMAT", "console")  # console|json
     log_handler = os.getenv("SUPEREGO_LOG_HANDLER", "print")  # print|write
     log_level = os.getenv("LOG_LEVEL", "INFO")
-    
+
     from .infrastructure.logging_config import configure_logging_explicit
+
     configure_logging_explicit(
         log_format=log_format,
         log_handler=log_handler,
         level=log_level,
-        stream=sys.stderr  # Always use stderr to avoid conflicts with STDIO transport
+        stream=sys.stderr,  # Always use stderr to avoid conflicts with STDIO transport
     )
 
     # Run the async main function

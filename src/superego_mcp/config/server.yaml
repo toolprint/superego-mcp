@@ -7,7 +7,7 @@ debug: false
 log_level: "INFO"
 
 # Rule engine settings
-rules_file: "/app/data/rules.yaml"
+rules_file: "config/rules.yaml"
 hot_reload: true
 
 # Health check settings

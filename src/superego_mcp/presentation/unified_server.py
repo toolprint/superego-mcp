@@ -11,12 +11,12 @@ and HTTP/WebSocket requests (via FastAPI) in a single process. This provides:
 """
 
 import asyncio
+import datetime as dt
 import os
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
-import datetime as dt
 from typing import Any
 
 import structlog
@@ -361,7 +361,7 @@ class UnifiedServer:
                 )
 
         @self.fastapi.get("/")
-        async def root():
+        async def root() -> dict[str, Any]:
             """Root endpoint with API information."""
             return {
                 "service": "Superego MCP Server",
@@ -381,7 +381,7 @@ class UnifiedServer:
             }
 
         @self.fastapi.get("/health")
-        async def health_redirect():
+        async def health_redirect() -> Any:
             """Redirect /health to /v1/health for compatibility."""
             from fastapi.responses import RedirectResponse
 
@@ -398,7 +398,9 @@ class UnifiedServer:
                 health_data = await self._health_check_internal()
                 return HealthResponse(
                     status=health_data.get("status", "unknown"),
-                    timestamp=health_data.get("timestamp", datetime.now(dt.UTC).isoformat()),
+                    timestamp=health_data.get(
+                        "timestamp", datetime.now(dt.UTC).isoformat()
+                    ),
                     components=health_data.get("components", {}),
                 )
             except Exception as e:
@@ -578,10 +580,10 @@ class UnifiedServer:
         try:
             health_status = await self.health_monitor.check_health()
             # Use model_dump with mode='json' to properly serialize datetime objects
-            health_data = health_status.model_dump(mode='json')
+            health_data = health_status.model_dump(mode="json")
             # Ensure timestamp is a string if it's not already
-            if isinstance(health_data.get('timestamp'), datetime):
-                health_data['timestamp'] = health_data['timestamp'].isoformat()
+            if isinstance(health_data.get("timestamp"), datetime):
+                health_data["timestamp"] = health_data["timestamp"].isoformat()
             return health_data
         except Exception as e:
             logger.error("Health check failed", error=str(e))
