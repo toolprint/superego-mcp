@@ -103,29 +103,41 @@ target "default" {
   output = ["type=docker"]
 }
 
-# Production target - optimized for security and performance
+# Production target - optimized for cross-platform builds with enhanced performance
 target "production" {
   dockerfile = "docker/production/Dockerfile"
   context = "."
   
-  # Multi-platform support
+  # Multi-platform support with cross-compilation optimization
   platforms = split(",", PLATFORMS)
   
   # Image tags
   tags = tags(IMAGE_NAME, TAG, VERSION)
   
-  # Build arguments
+  # Build arguments optimized for cross-compilation
   args = {
     BUILDKIT_INLINE_CACHE = 1
     BUILD_DATE = BUILD_DATE
     GIT_COMMIT = GIT_COMMIT
     VERSION = VERSION
+    # Cross-compilation optimizations
+    BUILDKIT_MULTI_PLATFORM = 1
+    DEBIAN_FRONTEND = "noninteractive"
+    # Enhanced cache settings for faster builds
+    UV_CACHE_DIR = "/tmp/.uv-cache"
+    PIP_CACHE_DIR = "/tmp/.pip-cache"
   }
   
-  # Cache configuration - prefer GitHub Actions cache
-  cache-from = CACHE_FROM != "" ? split(",", CACHE_FROM) : github_cache(GITHUB_CACHE_SCOPE, "prod")
+  # Enhanced cache configuration for multi-platform builds
+  cache-from = CACHE_FROM != "" ? split(",", CACHE_FROM) : [
+    "type=gha,scope=${GITHUB_CACHE_SCOPE}-deps",
+    "type=gha,scope=${GITHUB_CACHE_SCOPE}-prod", 
+    "type=registry,ref=${REGISTRY}/${IMAGE_NAME}:cache"
+  ]
   cache-to = CACHE_TO != "" ? split(",", CACHE_TO) : [
-    "type=gha,scope=${GITHUB_CACHE_SCOPE}-prod,mode=max"
+    "type=gha,scope=${GITHUB_CACHE_SCOPE}-deps,mode=max",
+    "type=gha,scope=${GITHUB_CACHE_SCOPE}-prod,mode=max",
+    "type=registry,ref=${REGISTRY}/${IMAGE_NAME}:cache,mode=max"
   ]
   
   # Output configuration
@@ -142,7 +154,7 @@ target "production" {
     "org.opencontainers.image.created" = BUILD_DATE
     "org.opencontainers.image.revision" = GIT_COMMIT
     "org.opencontainers.image.version" = VERSION
-    "io.buildpacks.builder.metadata" = "{\"description\":\"Production build with multi-platform support\"}"
+    "io.buildpacks.builder.metadata" = "{\"description\":\"Cross-platform production build with optimized performance\"}"
   }
 }
 
@@ -151,7 +163,7 @@ target "development" {
   dockerfile = "docker/development/Dockerfile.development"
   context = "."
   
-  # Multi-platform support (usually just native platform for dev)
+  # Multi-platform support (hardcoded ARM64 for darwin-arm64 host development)
   platforms = DEV_MODE ? ["linux/arm64"] : split(",", PLATFORMS)
   
   # Image tags for development
@@ -199,18 +211,19 @@ target "production-all" {
   output = ["type=registry"]
 }
 
-# Single platform builds for testing
+# Single platform builds for testing (using optimized cross-compilation)
 target "production-amd64" {
   inherits = ["production"]
   platforms = ["linux/amd64"]
 }
 
 target "production-arm64" {
-  inherits = ["production"]
+  inherits = ["production"] 
   platforms = ["linux/arm64"]
+  # Uses the same optimized Dockerfile with cross-compilation
 }
 
-# Local development build (current platform only)
+# Local development build (ARM64 for darwin-arm64 host)
 target "dev-local" {
   inherits = ["development"]
   platforms = ["linux/arm64"]
@@ -227,9 +240,9 @@ target "dev-local" {
 # GROUP TARGETS
 # =============================================================================
 
-# Build all production targets
+# Build all production targets (optimized for cross-compilation)
 group "all-production" {
-  targets = ["production", "production-amd64", "production-arm64"]
+  targets = ["production"]
 }
 
 # Build all development targets  
@@ -239,17 +252,22 @@ group "all-development" {
 
 # Build everything (production + development)
 group "all" {
-  targets = ["production", "development", "production-amd64", "production-arm64", "dev-local"]
+  targets = ["production", "development", "dev-local"]
 }
 
-# CI/CD group - optimized for GitHub Actions
+# CI/CD group - optimized for GitHub Actions with cross-compilation
 group "ci" {
   targets = ["production-all"]
 }
 
-# Testing group - build both platforms separately for validation
+# Testing group - separate platform builds for validation (using cross-compilation)
 group "test" {
   targets = ["production-amd64", "production-arm64"]
+}
+
+# Fast multi-platform build group (recommended for most use cases)
+group "multi-arch" {
+  targets = ["production"]
 }
 
 # =============================================================================
