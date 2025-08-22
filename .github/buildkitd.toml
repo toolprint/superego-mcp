@@ -13,8 +13,8 @@ trace = false
   # Enable network.host and security.insecure entitlements for build optimization
   # These are configured via buildkitd-flags in the workflow
 
-# Storage configuration
-[worker.oci.gcpolicy]
+# Storage configuration - correct TOML table structure
+[worker.oci.gc]
   # Keep intermediate build layers to improve cache efficiency
   keepDuration = "48h"
   # Reserve some disk space for system operations

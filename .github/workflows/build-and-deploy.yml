@@ -123,7 +123,7 @@ jobs:
         buildkitd-flags: |
           --allow-insecure-entitlement security.insecure
           --allow-insecure-entitlement network.host
-        config: .github/buildkitd.toml  # Performance settings including max-parallelism
+        buildkitd-config: .github/buildkitd.toml  # Performance settings including max-parallelism
     
     - name: Log in to Container Registry
       if: github.event_name != 'pull_request'
