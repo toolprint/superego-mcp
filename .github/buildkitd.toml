@@ -1,5 +1,6 @@
 # BuildKit daemon configuration for optimized multi-platform builds
 # This configuration is used by GitHub Actions to set performance parameters
+# Updated for 2025 best practices
 
 debug = false
 trace = false
@@ -13,16 +14,20 @@ trace = false
   # Enable network.host and security.insecure entitlements for build optimization
   # These are configured via buildkitd-flags in the workflow
 
-# Storage configuration - correct TOML table structure
-[worker.oci.gc]
+# Storage garbage collection policies - using array syntax for gcpolicy
+# Multiple policies can be defined with different priorities
+[[worker.oci.gcpolicy]]
   # Keep intermediate build layers to improve cache efficiency
-  keepDuration = "48h"
+  keepDuration = 172800  # 48 hours in seconds
   # Reserve some disk space for system operations
-  reservedSpace = "10%"
+  reservedSpace = 10737418240  # 10GB in bytes
+  
+[[worker.oci.gcpolicy]]
+  # More aggressive cleanup if space is needed
+  all = true
+  reservedSpace = 5368709120  # 5GB in bytes
 
 # Registry configuration for optimized layer compression
-[registry]
-  # Use faster compression for layer uploads
-  [registry."ghcr.io"]
-    compression = "gzip"
-    compression-level = 6
+[registry."ghcr.io"]
+  compression = "gzip"
+  compression-level = 6
