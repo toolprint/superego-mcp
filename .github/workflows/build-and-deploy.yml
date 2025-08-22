@@ -120,7 +120,6 @@ jobs:
         driver: docker-container
         driver-opts: |
           network=host
-          cpu=8
         buildkitd-flags: |
           --allow-insecure-entitlement security.insecure
           --allow-insecure-entitlement network.host
