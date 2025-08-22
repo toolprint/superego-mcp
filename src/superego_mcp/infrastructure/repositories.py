@@ -1,5 +1,6 @@
 """Infrastructure implementations of domain repositories."""
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,24 @@ from watchfiles import awatch
 
 from superego_mcp.domain.models import SecurityRule
 from superego_mcp.domain.repositories import RuleRepository
+
+
+def is_ci_environment() -> bool:
+    """Detect if running in a CI environment.
+
+    Returns:
+        True if running in CI (GitHub Actions, GitLab CI, etc.), False otherwise
+    """
+    return any(
+        [
+            os.getenv("CI"),
+            os.getenv("GITHUB_ACTIONS"),
+            os.getenv("GITLAB_CI"),
+            os.getenv("JENKINS_URL"),
+            os.getenv("BUILDKITE"),
+            os.getenv("CIRCLECI"),
+        ]
+    )
 
 
 class YamlRuleRepository(RuleRepository):
@@ -96,8 +115,14 @@ class YamlRuleRepository(RuleRepository):
         Args:
             callback: Optional callback to call when file changes
         """
+        # In CI environments, ignore permission denied errors to avoid
+        # failures with systemd private directories and other restricted paths
+        ignore_perms = is_ci_environment()
+
         # Watch the rules file for changes using async iterator
-        async for _changes in awatch(str(self.rules_file_path)):
+        async for _changes in awatch(
+            str(self.rules_file_path), ignore_permission_denied=ignore_perms
+        ):
             self.reload_rules()
             if callback:
                 await callback()

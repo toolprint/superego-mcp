@@ -1,6 +1,7 @@
 """Configuration file watcher for hot-reload functionality."""
 
 import asyncio
+import os
 from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,24 @@ import structlog
 from watchfiles import awatch
 
 from ..domain.models import ErrorCode, SuperegoError
+
+
+def is_ci_environment() -> bool:
+    """Detect if running in a CI environment.
+
+    Returns:
+        True if running in CI (GitHub Actions, GitLab CI, etc.), False otherwise
+    """
+    return any(
+        [
+            os.getenv("CI"),
+            os.getenv("GITHUB_ACTIONS"),
+            os.getenv("GITLAB_CI"),
+            os.getenv("JENKINS_URL"),
+            os.getenv("BUILDKITE"),
+            os.getenv("CIRCLECI"),
+        ]
+    )
 
 
 class ConfigWatcher:
@@ -94,13 +113,28 @@ class ConfigWatcher:
             watch_dir = self.watch_path.parent
             filename = self.watch_path.name
 
+            # In CI environments, ignore permission denied errors to avoid
+            # failures with systemd private directories and other restricted paths
+            ignore_perms = is_ci_environment()
+
+            if ignore_perms:
+                self.logger.debug(
+                    "CI environment detected, ignoring permission denied errors",
+                    watch_dir=str(watch_dir),
+                )
+
             self.logger.debug(
                 "Starting file system watch",
                 watch_dir=str(watch_dir),
                 filename=filename,
+                ignore_permission_denied=ignore_perms,
             )
 
-            async for changes in awatch(watch_dir, stop_event=self._shutdown_event):
+            async for changes in awatch(
+                watch_dir,
+                stop_event=self._shutdown_event,
+                ignore_permission_denied=ignore_perms,
+            ):
                 # Filter changes to only our target file
                 relevant_changes = [
                     change for change in changes if Path(change[1]).name == filename
