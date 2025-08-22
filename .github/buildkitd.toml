@@ -1,0 +1,28 @@
+# BuildKit daemon configuration for optimized multi-platform builds
+# This configuration is used by GitHub Actions to set performance parameters
+
+debug = false
+trace = false
+
+# Worker configuration for OCI (runC) worker
+[worker.oci]
+  # Limit the number of parallel build steps to prevent resource exhaustion
+  # This is particularly important in CI environments with limited resources
+  max-parallelism = 4
+  
+  # Enable network.host and security.insecure entitlements for build optimization
+  # These are configured via buildkitd-flags in the workflow
+
+# Storage configuration
+[worker.oci.gcpolicy]
+  # Keep intermediate build layers to improve cache efficiency
+  keepDuration = "48h"
+  # Reserve some disk space for system operations
+  reservedSpace = "10%"
+
+# Registry configuration for optimized layer compression
+[registry]
+  # Use faster compression for layer uploads
+  [registry."ghcr.io"]
+    compression = "gzip"
+    compression-level = 6
