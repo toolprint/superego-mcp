@@ -74,6 +74,11 @@ function "tags" {
   ]
 }
 
+# Environment variable for Docker Metadata tags (when set by CI)
+variable "DOCKER_METADATA_TAGS" {
+  default = ""
+}
+
 # Function to generate cache configuration for GitHub Actions
 function "github_cache" {
   params = [scope, mode]
@@ -111,8 +116,8 @@ target "production" {
   # Multi-platform support with cross-compilation optimization
   platforms = split(",", PLATFORMS)
   
-  # Image tags
-  tags = tags(IMAGE_NAME, TAG, VERSION)
+  # Image tags - use metadata tags from CI if available, otherwise use function
+  tags = DOCKER_METADATA_TAGS != "" ? split(",", DOCKER_METADATA_TAGS) : tags(IMAGE_NAME, TAG, VERSION)
   
   # Build arguments optimized for cross-compilation
   args = {

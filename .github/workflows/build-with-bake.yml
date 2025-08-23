@@ -129,8 +129,6 @@ jobs:
         set: |
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
-          production.tags=${{ steps.meta.outputs.tags }}
-          production.labels=${{ steps.meta.outputs.labels }}
         provenance: true
         sbom: true
       env:
@@ -140,6 +138,7 @@ jobs:
         BUILD_DATE: ${{ steps.meta.outputs.created }}
         GIT_COMMIT: ${{ github.sha }}
         PUSH: ${{ github.event_name != 'pull_request' }}
+        DOCKER_METADATA_TAGS: ${{ steps.meta.outputs.tags }}
 
   # Security scanning with Trivy
   security-scan:
