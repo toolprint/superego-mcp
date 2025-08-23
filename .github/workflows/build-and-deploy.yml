@@ -14,12 +14,13 @@ on:
         default: false
         type: boolean
 
-# Required permissions for GHCR push
+# Required permissions for GHCR push and security scanning
 permissions:
   contents: read
   packages: write
   attestations: write
   id-token: write
+  security-events: write
 
 env:
   REGISTRY: ghcr.io
@@ -219,6 +220,38 @@ jobs:
           type=sha,format=long
           type=raw,value=latest,enable={{is_default_branch}}
     
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Wait for image availability
+      run: |
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+        echo "Waiting for image $IMAGE to be available for security scanning..."
+        
+        MAX_ATTEMPTS=10
+        WAIT_TIME=10
+        
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          echo "Attempt $i/$MAX_ATTEMPTS..."
+          if docker pull "$IMAGE"; then
+            echo "✅ Image successfully pulled!"
+            break
+          fi
+          
+          if [ $i -lt $MAX_ATTEMPTS ]; then
+            echo "Image not ready yet. Waiting ${WAIT_TIME}s..."
+            sleep $WAIT_TIME
+            WAIT_TIME=$((WAIT_TIME * 2))  # Exponential backoff
+          else
+            echo "❌ Failed to pull image after $MAX_ATTEMPTS attempts"
+            exit 1
+          fi
+        done
+    
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
@@ -231,7 +264,7 @@ jobs:
     
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && hashFiles('trivy-results.sarif') != ''
       with:
         sarif_file: 'trivy-results.sarif'
     
@@ -247,7 +280,7 @@ jobs:
     
     - name: Upload vulnerability scan results
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && (hashFiles('trivy-results.sarif') != '' || hashFiles('trivy-results.txt') != '')
       with:
         name: trivy-vulnerability-results
         path: |
@@ -256,6 +289,7 @@ jobs:
         retention-days: 30
     
     - name: Check for critical vulnerabilities
+      if: hashFiles('trivy-results.txt') != ''
       run: |
         echo "Checking for critical vulnerabilities..."
         if grep -q "CRITICAL" trivy-results.txt; then
@@ -289,6 +323,38 @@ jobs:
           type=semver,pattern={{major}}
           type=sha,format=long
           type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Wait for image availability
+      run: |
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+        echo "Waiting for image $IMAGE to be available..."
+        
+        MAX_ATTEMPTS=10
+        WAIT_TIME=10
+        
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          echo "Attempt $i/$MAX_ATTEMPTS..."
+          if docker pull "$IMAGE"; then
+            echo "✅ Image successfully pulled!"
+            exit 0
+          fi
+          
+          if [ $i -lt $MAX_ATTEMPTS ]; then
+            echo "Image not ready yet. Waiting ${WAIT_TIME}s..."
+            sleep $WAIT_TIME
+            WAIT_TIME=$((WAIT_TIME * 2))  # Exponential backoff
+          fi
+        done
+        
+        echo "❌ Failed to pull image after $MAX_ATTEMPTS attempts"
+        exit 1
     
     - name: Test container startup
       run: |
