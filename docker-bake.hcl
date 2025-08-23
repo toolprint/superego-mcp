@@ -108,6 +108,13 @@ target "default" {
   output = ["type=docker"]
 }
 
+# Single platform target for CI testing
+target "production-single" {
+  inherits = ["production"]
+  platforms = ["linux/amd64"]
+  output = ["type=image"]
+}
+
 # Production target - optimized for cross-platform builds with enhanced performance
 target "production" {
   dockerfile = "docker/production/Dockerfile"
@@ -145,8 +152,8 @@ target "production" {
     "type=registry,ref=${REGISTRY}/${IMAGE_NAME}:cache,mode=max"
   ]
   
-  # Output configuration
-  output = PUSH ? ["type=registry"] : ["type=docker"]
+  # Output configuration - avoid type=docker for multi-platform builds
+  output = PUSH ? ["type=registry"] : ["type=image"]
   
   # Labels for metadata
   labels = {
