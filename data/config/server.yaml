@@ -1,0 +1,125 @@
+# Superego MCP Server Configuration
+
+# Server settings
+host: "localhost"
+port: 8000
+debug: false
+log_level: "INFO"
+
+# Rule engine settings
+rules_file: "/app/data/rules.yaml"
+hot_reload: true
+
+# Health check settings
+health_check_enabled: true
+health_check_interval: 30
+
+# Rate limiting (optional)
+rate_limit_enabled: false
+rate_limit_requests: 100
+
+# AI Sampling Configuration (Legacy - maintained for backward compatibility)
+ai_sampling:
+  enabled: false
+  primary_provider: "claude"
+  fallback_provider: "openai"
+  timeout_seconds: 10
+  cache_ttl_seconds: 300
+  max_concurrent_requests: 10
+  claude_model: "claude-sonnet-4-20250514"
+  openai_model: "gpt-4-turbo-preview"
+  temperature: 0.0
+
+# Inference System Configuration (New extensible system)
+inference:
+  # Default timeout for all inference requests
+  timeout_seconds: 30
+  
+  # Provider preference order (first successful wins)
+  provider_preference:
+    - "claude_cli"      # Use Claude CLI as primary
+    - "mcp_sampling"    # Use existing MCP sampling as fallback
+  
+  # CLI provider configurations
+  cli_providers:
+    - name: "claude_cli"
+      enabled: true      # Enable CLI provider
+      type: "claude"
+      command: "claude"
+      model: "claude-sonnet-4-20250514"
+      system_prompt: |
+        You are a security evaluation system for tool execution requests.
+        Respond with JSON containing:
+        - decision (allow/deny)
+        - confidence (0.0-1.0)
+        - reasoning (brief explanation)
+        - risk_factors (array of identified risks)
+        
+        Example response:
+        {
+          "decision": "allow",
+          "confidence": 0.8,
+          "reasoning": "File read operation in safe directory with no sensitive data exposure risk",
+          "risk_factors": []
+        }
+      api_key_env_var: "ANTHROPIC_API_KEY"
+      max_retries: 2
+      retry_delay_ms: 1000
+      timeout_seconds: 10
+  
+  # Future: Direct API provider configurations
+  api_providers: []
+
+# Multi-Transport Configuration
+transport:
+  stdio:
+    # STDIO transport is always enabled for CLI usage
+    enabled: true
+    
+  http:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8000
+    cors_origins: ["*"]
+    
+  sse:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8002
+    cors_origins: ["*"]
+    keepalive_interval: 30
+
+# Performance Optimization Configuration
+performance:
+  metrics_enabled: true
+  metrics_port: 9090
+  
+  # Request queue configuration
+  request_queue:
+    max_size: 1000
+    timeout_seconds: 30
+    ai_sampling_concurrency: 10
+    enable_backpressure: true
+    
+  # Connection pooling configuration
+  connection_pooling:
+    max_connections: 100
+    max_keepalive_connections: 20
+    keepalive_timeout: 30
+    
+  # Response caching configuration
+  caching:
+    response_cache_ttl: 300
+    pattern_cache_size: 1000
+    enable_compression: true
+    
+  # Memory optimization
+  memory:
+    object_pool_size: 100
+    intern_strings: true
+    
+  # Request batching
+  batching:
+    enabled: true
+    batch_size: 10
+    batch_timeout: 0.5

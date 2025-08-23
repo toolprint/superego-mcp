@@ -1,7 +1,7 @@
 """Main entry point for Superego MCP Server."""
 
 import asyncio
-import logging
+import os
 import signal
 import sys
 from pathlib import Path
@@ -20,8 +20,19 @@ from .infrastructure.prompt_builder import SecurePromptBuilder
 
 def main() -> None:
     """Main application bootstrap with hot-reload support"""
-    # Setup logging
-    logging.basicConfig(level=logging.INFO)
+    # Configure logging using explicit environment variables
+    log_format = os.getenv("SUPEREGO_LOG_FORMAT", "console")  # console|json
+    log_handler = os.getenv("SUPEREGO_LOG_HANDLER", "print")  # print|write
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+
+    from .infrastructure.logging_config import configure_logging_explicit
+
+    configure_logging_explicit(
+        log_format=log_format,
+        log_handler=log_handler,
+        level=log_level,
+        stream=sys.stderr,  # Always use stderr to avoid conflicts with STDIO transport
+    )
 
     # Run the async main function
     try:
@@ -36,24 +47,14 @@ def main() -> None:
 
 async def async_main(transport: str | None = None, port: int | None = None) -> None:
     """Async main function with lifecycle management"""
-    # Configure logging based on transport type
-    if transport == "stdio":
-        from .infrastructure.logging_config import configure_stderr_logging
-
-        configure_stderr_logging(level="INFO", json_logs=False)
-    else:
-        # For http or default, use standard logging
-        from .infrastructure.logging_config import configure_logging
-
-        configure_logging(level="INFO", json_logs=False)
+    # Logging is now configured in main() function using environment variables
 
     # Load configuration
     config_manager = ConfigManager()
     config = config_manager.load_config()
 
-    # Initialize configuration paths
-    config_dir = Path("config")
-    rules_file = config_dir / "rules.yaml"
+    # Initialize configuration paths from loaded config
+    rules_file = Path(config.rules_file)
 
     # Create components
     error_handler = ErrorHandler()
@@ -170,10 +171,10 @@ async def async_main(transport: str | None = None, port: int | None = None) -> N
 
     print("Starting Superego MCP Server with hot-reload support...")
 
-    # Create multi-transport server
-    from .presentation.transport_server import MultiTransportServer
+    # Create unified server (FastAPI + MCP in single process)
+    from .presentation.unified_server import UnifiedServer
 
-    multi_transport_server = MultiTransportServer(
+    unified_server = UnifiedServer(
         security_policy=security_policy,
         audit_logger=audit_logger,
         error_handler=error_handler,
@@ -231,7 +232,7 @@ async def async_main(transport: str | None = None, port: int | None = None) -> N
         print("Server ready - press Ctrl+C to stop")
 
         # Run server in a separate task to allow for graceful shutdown
-        server_task = asyncio.create_task(multi_transport_server.start())
+        server_task = asyncio.create_task(unified_server.start())
         shutdown_task = asyncio.create_task(shutdown_event.wait())
 
         # Wait for either server completion or shutdown signal
@@ -249,8 +250,8 @@ async def async_main(transport: str | None = None, port: int | None = None) -> N
 
     finally:
         # Cleanup resources
-        print("Stopping multi-transport server...")
-        await multi_transport_server.stop()
+        print("Stopping unified server...")
+        await unified_server.stop()
 
         print("Stopping configuration watcher...")
         await config_watcher.stop()

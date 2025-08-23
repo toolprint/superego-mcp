@@ -1,0 +1,16 @@
+# Superego MCP Server Configuration
+# This is a minimal default configuration for production deployment
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "info"
+  
+security:
+  enabled: true
+  
+monitoring:
+  enabled: true
+  health_check_path: "/health"
+  
+# Add your custom rules and configuration here

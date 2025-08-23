@@ -1,0 +1,11 @@
+# Security Reports Directory
+
+This directory stores security scan reports and audit logs.
+
+Reports are generated automatically by:
+- Trivy vulnerability scans
+- Container security assessments  
+- Compliance audits
+- Penetration testing results
+
+Files in this directory are excluded from git by default for security reasons.

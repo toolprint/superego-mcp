@@ -1,0 +1,157 @@
+# Docker build context optimization for superego-mcp
+# Exclude unnecessary files to reduce build context size and improve build performance
+
+# Version control
+.git
+.gitignore
+.gitmodules
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Demo and example files
+demo/
+examples/
+
+# Development configuration
+.devcontainer/
+.docker/
+docker-compose.yml
+docker-compose.*.yml
+
+# Logs and temporary files
+*.log
+logs/
+*.tmp
+*.temp
+.env.local
+.env.development
+.env.test
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Package manager files (keep lock files but exclude package dirs)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Development tools
+.mypy_cache/
+.ruff_cache/
+.pre-commit-config.yaml
+
+# Jupyter notebooks (if any)
+.ipynb_checkpoints
+
+# Local development databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend build artifacts (if applicable)
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+
+# Terraform and infrastructure
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Secrets and sensitive files
+secrets/
+.secrets
+*.pem
+*.key
+!*.pub
+
+# Large files that shouldn't be in containers
+*.iso
+*.dmg
+*.zip
+*.tar.gz
+*.tar.bz2
+
+# Keep only essential files for production builds
+!src/
+!pyproject.toml
+!uv.lock
+!hatch_build.py
+!README.md
+!docker/production/

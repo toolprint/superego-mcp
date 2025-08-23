@@ -1,0 +1,359 @@
+# Resource Limits and Quotas for Superego MCP Production Deployment
+# Kubernetes and Docker Compose resource configurations
+
+# Docker Compose Resource Limits
+docker_compose:
+  superego-mcp:
+    deploy:
+      resources:
+        limits:
+          # CPU limits (cores)
+          cpus: '2.0'
+          # Memory limits  
+          memory: 2G
+          # Process limits
+          pids: 200
+          # Network bandwidth (if supported)
+          # network_rx: 100M
+          # network_tx: 100M
+        
+        reservations:
+          # Guaranteed resources
+          cpus: '0.5'
+          memory: 512M
+      
+      # Restart policy
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+        
+      # Placement constraints (for swarm mode)
+      placement:
+        constraints:
+          - node.role == worker
+          - node.labels.security == high
+        
+        preferences:
+          - spread: node.labels.zone
+  
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+          pids: 100
+        reservations:
+          cpus: '0.1'  
+          memory: 128M
+  
+  nginx:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+          pids: 100
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+# Kubernetes Resource Limits
+kubernetes:
+  # Namespace configuration
+  namespace:
+    name: superego-prod
+    labels:
+      security: high
+      environment: production
+    
+    # Resource quotas for the namespace
+    resource_quota:
+      hard:
+        requests.cpu: "4"
+        requests.memory: 8Gi
+        limits.cpu: "8"
+        limits.memory: 16Gi
+        persistentvolumeclaims: "10"
+        services: "10"
+        secrets: "20"
+        configmaps: "20"
+  
+  # Pod resource specifications
+  pods:
+    superego-mcp:
+      resources:
+        requests:
+          cpu: 500m      # 0.5 CPU cores
+          memory: 512Mi  # 512 MB
+        limits:
+          cpu: 2000m     # 2 CPU cores
+          memory: 2Gi    # 2 GB
+      
+      # Quality of Service class
+      qos_class: Burstable  # Guaranteed, Burstable, or BestEffort
+      
+      # Security context
+      security_context:
+        run_as_user: 1000
+        run_as_group: 1000
+        run_as_non_root: true
+        fs_group: 1000
+        
+        # Capabilities
+        capabilities:
+          drop: ["ALL"]
+          add: ["NET_BIND_SERVICE", "SETGID", "SETUID"]
+        
+        # Security options
+        allow_privilege_escalation: false
+        read_only_root_filesystem: true
+        
+        # SELinux/AppArmor
+        se_linux_options:
+          level: "s0:c123,c456"
+        apparmor_profile:
+          type: RuntimeDefault
+        seccomp_profile:
+          type: RuntimeDefault
+    
+    redis:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    
+    nginx:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 1000m
+          memory: 256Mi
+
+# System Resource Monitoring Thresholds
+monitoring_thresholds:
+  # CPU utilization alerts
+  cpu:
+    warning: 70    # percent
+    critical: 85   # percent
+    duration: 5m   # sustained for this duration
+  
+  # Memory utilization alerts
+  memory:
+    warning: 80    # percent
+    critical: 90   # percent
+    duration: 2m
+  
+  # Disk utilization alerts
+  disk:
+    warning: 80    # percent
+    critical: 90   # percent
+    paths:
+      - /app/data
+      - /app/logs
+      - /tmp
+  
+  # Network utilization alerts
+  network:
+    warning: 80    # percent of limit
+    critical: 90   # percent of limit
+    metrics:
+      - rx_bytes
+      - tx_bytes
+      - connections
+  
+  # Process limits
+  processes:
+    warning: 150   # number of processes
+    critical: 180  # number of processes
+
+# Application-Level Resource Limits
+application_limits:
+  # HTTP server limits
+  http_server:
+    max_connections: 1000
+    max_requests_per_connection: 100
+    connection_timeout: 30s
+    request_timeout: 60s
+    keepalive_timeout: 5s
+    
+    # Request size limits
+    max_request_body_size: 1MB
+    max_header_size: 8KB
+    max_uri_length: 2KB
+  
+  # AI service limits
+  ai_service:
+    max_concurrent_requests: 10
+    request_timeout: 30s
+    max_tokens_per_request: 4000
+    max_prompt_length: 50000
+    max_response_length: 100000
+    
+    # Circuit breaker settings
+    circuit_breaker:
+      failure_threshold: 5
+      recovery_timeout: 5m
+      timeout: 60s
+  
+  # Database limits (Redis)
+  database:
+    max_connections: 100
+    connection_timeout: 10s
+    command_timeout: 5s
+    max_memory_usage: 256MB
+    
+    # Connection pooling
+    pool_size: 10
+    max_idle_connections: 5
+    connection_max_lifetime: 1h
+  
+  # Cache limits
+  cache:
+    max_size: 1000        # number of entries
+    max_memory: 128MB     # memory usage
+    ttl: 3600s           # default TTL
+    cleanup_interval: 300s # cleanup frequency
+  
+  # Logging limits
+  logging:
+    max_file_size: 100MB
+    max_files: 5
+    max_log_rate: 1000    # logs per second
+    buffer_size: 10000    # log entries
+    flush_interval: 5s
+
+# Resource Scaling Configuration
+scaling:
+  # Horizontal Pod Autoscaler (HPA) configuration
+  hpa:
+    enabled: true
+    min_replicas: 1
+    max_replicas: 10
+    
+    # Scaling metrics
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            average_utilization: 70
+      
+      - type: Resource
+        resource:
+          name: memory
+          target:
+            type: Utilization
+            average_utilization: 80
+      
+      # Custom metrics (if available)
+      - type: Object
+        object:
+          metric:
+            name: requests_per_second
+          target:
+            type: Value
+            value: 50
+    
+    # Scaling behavior
+    behavior:
+      scale_up:
+        stabilization_window_seconds: 60
+        policies:
+          - type: Percent
+            value: 100
+            period_seconds: 60
+      
+      scale_down:
+        stabilization_window_seconds: 300
+        policies:
+          - type: Percent
+            value: 50
+            period_seconds: 60
+  
+  # Vertical Pod Autoscaler (VPA) configuration
+  vpa:
+    enabled: false  # Disabled by default, enable if needed
+    update_mode: "Off"  # Off, Auto, or Initial
+    
+    # Resource policy
+    resource_policy:
+      container_policies:
+        - container_name: superego-mcp
+          min_allowed:
+            cpu: 100m
+            memory: 128Mi
+          max_allowed:
+            cpu: 4000m
+            memory: 4Gi
+
+# Security Resource Limits
+security_limits:
+  # File system limits
+  filesystem:
+    max_file_descriptors: 65536
+    max_open_files: 10000
+    max_file_size: 100MB
+    
+    # Temporary file limits
+    tmp_size: 100MB
+    tmp_files: 1000
+  
+  # Network limits
+  network:
+    max_connections_per_ip: 10
+    max_bandwidth_per_connection: 10MB/s
+    connection_rate_limit: 100/min
+    
+    # Protocol limits
+    max_http_headers: 100
+    max_websocket_connections: 50
+  
+  # Process limits
+  process:
+    max_processes: 200
+    max_threads_per_process: 50
+    max_memory_per_process: 1GB
+    
+    # Runtime limits
+    max_cpu_time: 300s      # per request
+    max_wall_time: 600s     # per request
+    max_core_dump_size: 0   # disabled
+  
+  # Security scanning limits
+  security_scanning:
+    max_scan_time: 300s
+    max_scan_memory: 512MB
+    scan_queue_size: 10
+    concurrent_scans: 2
+
+# Backup and Recovery Resource Limits
+backup_limits:
+  # Backup process limits
+  backup_process:
+    max_cpu: 500m
+    max_memory: 256Mi
+    max_duration: 1h
+    
+    # Backup size limits
+    max_backup_size: 10GB
+    retention_count: 30
+    compression_enabled: true
+  
+  # Recovery process limits
+  recovery_process:
+    max_cpu: 1000m
+    max_memory: 512Mi
+    max_duration: 2h
+    
+    # Recovery validation
+    validation_timeout: 30m
+    test_restore_frequency: weekly

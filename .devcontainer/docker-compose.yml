@@ -1,0 +1,168 @@
+# DevContainer-specific Docker Compose overrides
+# Extends the main docker-compose.dev.yml with DevContainer optimizations
+# Ensures fast startup (<30s) and optimal development experience
+
+version: '3.8'
+
+services:
+  superego-dev:
+    # Override the main development service for DevContainer usage
+    container_name: superego-mcp-devcontainer
+    hostname: superego-devcontainer
+    
+    # DevContainer-specific environment variables
+    environment:
+      # Inherit all variables from docker-compose.dev.yml
+      - CONTAINER_TYPE=devcontainer
+      - VSCODE_INTEGRATION=1
+      - DEVCONTAINER_WORKSPACE=/app
+      
+      # Optimize for DevContainer performance
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONPATH=/app/src
+      - DEVELOPMENT=1
+      - LOG_LEVEL=INFO  # Less verbose for DevContainer
+      - HOT_RELOAD=1
+      
+      # Configuration paths
+      - SUPEREGO_CONFIG_PATH=/app/config/server.yaml
+      - SUPEREGO_RULES_PATH=/app/config/rules.yaml
+      
+      # UV optimizations
+      - UV_CACHE_DIR=/app/.cache/uv
+      - UV_PYTHON=/usr/local/bin/python
+      
+      # Debugging (disabled by default in DevContainer)
+      - DEBUGPY_ENABLED=0
+      - DEBUGPY_PORT=5678
+    
+    # DevContainer-specific volume mounts for optimal performance
+    volumes:
+      # Source code (bind mounts for immediate sync)
+      - ../src:/app/src:cached
+      - ../config:/app/config:cached
+      - ../tests:/app/tests:cached
+      - ../demo:/app/demo:cached
+      
+      # Configuration files (read-only)
+      - ../pyproject.toml:/app/pyproject.toml:ro
+      - ../uv.lock:/app/uv.lock:ro
+      - ../justfile:/app/justfile:ro
+      
+      # DevContainer-specific directories
+      - .:/app/.devcontainer:cached
+      - ../docs:/app/docs:cached
+      
+      # Performance-optimized named volumes
+      - devcontainer-logs:/app/logs
+      - devcontainer-cache:/app/.cache
+      - devcontainer-tmp:/app/tmp
+      
+      # Git repository (for GitLens and version control)
+      - ../.git:/app/.git:cached
+      
+      # VS Code settings and extensions (if needed)
+      - devcontainer-vscode:/app/.vscode-server
+    
+    # DevContainer startup command with faster initialization
+    command: >
+      bash -c "
+        set -e;
+        echo '🏗️  Initializing Superego MCP DevContainer...';
+        
+        # Quick health check
+        echo '🔍 Checking environment...';
+        python --version;
+        uv --version;
+        
+        # Verify project structure
+        if [ ! -f '/app/src/superego_mcp/__init__.py' ]; then
+          echo '❌ Project source not found - check volume mounts';
+          exit 1;
+        fi;
+        
+        echo '✅ Environment ready';
+        echo '🚀 Starting Superego MCP Server...';
+        echo '📍 Server: http://localhost:8000 (forwarded to 8002)';
+        echo '📊 Monitor: http://localhost:8001 (forwarded to 8003)';
+        echo '🐛 Debug: Port 5678 (forwarded to 5679) - use DEBUGPY_ENABLED=1';
+        echo '📁 Workspace: /app';
+        echo '';
+        
+        # Start the server in development mode
+        exec uv run python -m superego_mcp.main
+      "
+    
+    # Healthcheck optimized for DevContainer
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s 
+      retries: 3
+      start_period: 30s  # Allow time for DevContainer initialization
+    
+    # Resource allocation for development workstation
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'    # Reasonable limit for DevContainer
+          memory: 2G     # Sufficient for development
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Labels for DevContainer identification
+    labels:
+      - "superego.container.type=devcontainer"
+      - "superego.environment=development"
+      - "devcontainer.metadata=superego-mcp"
+
+  # Optional monitoring service for DevContainer (profile-based)
+  monitoring-dev:
+    profiles: ["monitoring", "full"]
+    container_name: superego-monitoring-devcontainer
+    
+    environment:
+      - CONTAINER_TYPE=devcontainer
+      - DEVELOPMENT=1
+      - SUPEREGO_SERVER_URL=http://superego-dev:8000
+    
+    # Override command for DevContainer usage
+    command: >
+      bash -c "
+        echo '📊 Starting monitoring dashboard...';
+        echo '🌐 Dashboard: http://localhost:3000';
+        cd /app && uv run python -m demo.demo_dashboard --host 0.0.0.0 --port 3000 --dev
+      "
+    
+    labels:
+      - "superego.container.type=devcontainer-monitoring"
+      - "superego.environment=development"
+
+# DevContainer-specific named volumes for optimal performance
+volumes:
+  devcontainer-logs:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=50m,uid=1000,gid=1000"
+  
+  devcontainer-cache:
+    driver: local
+    # Persistent cache for better startup performance
+    
+  devcontainer-tmp:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs  
+      o: "size=100m,uid=1000,gid=1000"
+      
+  devcontainer-vscode:
+    driver: local
+    # VS Code server extensions and settings
+
+# Network configuration inherits from main docker-compose.dev.yml
+# No additional network configuration needed

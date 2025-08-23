@@ -78,7 +78,7 @@ class HTTPTransport:
         self.app = FastAPI(
             title="Superego MCP Server",
             description="Security evaluation and policy enforcement API",
-            version="0.1.0",
+            version="0.0.0",
             docs_url="/docs",
             redoc_url="/redoc",
         )
@@ -156,7 +156,139 @@ class HTTPTransport:
     def _setup_routes(self) -> None:
         """Set up HTTP API routes."""
 
-        @self.app.post("/v1/evaluate", response_model=Decision)
+        @self.app.post(
+            "/v1/evaluate",
+            response_model=Decision,
+            summary="Evaluate tool request for security",
+            description="Analyzes a tool request against security policies and returns an allow/deny/sample decision.",
+            openapi_extra={
+                "examples": {
+                    "safe_file_operation": {
+                        "summary": "Safe file read operation",
+                        "description": "Reading a configuration file from allowed directory",
+                        "value": {
+                            "tool_name": "Read",
+                            "parameters": {
+                                "file_path": "/etc/config/app.yaml",
+                                "encoding": "utf-8",
+                            },
+                            "agent_id": "claude-assistant",
+                            "session_id": "sess_abc123",
+                            "cwd": "/home/user/project",
+                        },
+                    },
+                    "git_status": {
+                        "summary": "Git status check",
+                        "description": "Checking git repository status - typically allowed",
+                        "value": {
+                            "tool_name": "Bash",
+                            "parameters": {
+                                "command": "git status --porcelain",
+                                "description": "Check git working tree status",
+                            },
+                            "agent_id": "dev-assistant",
+                            "session_id": "sess_dev456",
+                            "cwd": "/home/user/myproject",
+                        },
+                    },
+                    "dangerous_operation": {
+                        "summary": "Dangerous system operation",
+                        "description": "Operation that modifies system files - typically denied",
+                        "value": {
+                            "tool_name": "Bash",
+                            "parameters": {
+                                "command": "sudo rm -rf /usr/local/bin/*",
+                                "description": "Remove system binaries",
+                            },
+                            "agent_id": "risky-agent",
+                            "session_id": "sess_danger789",
+                            "cwd": "/tmp",
+                        },
+                    },
+                    "network_operation": {
+                        "summary": "Network request requiring evaluation",
+                        "description": "External API call that may require sampling/approval",
+                        "value": {
+                            "tool_name": "WebFetch",
+                            "parameters": {
+                                "url": "https://api.external-service.com/data",
+                                "method": "POST",
+                                "headers": {"Authorization": "Bearer token123"},
+                            },
+                            "agent_id": "web-crawler",
+                            "session_id": "sess_net999",
+                            "cwd": "/home/user/crawler",
+                        },
+                    },
+                }
+            },
+            responses={
+                200: {
+                    "description": "Security decision returned successfully",
+                    "content": {
+                        "application/json": {
+                            "examples": {
+                                "allow_decision": {
+                                    "summary": "Tool request allowed",
+                                    "value": {
+                                        "action": "allow",
+                                        "reason": "File read operation from safe directory",
+                                        "rule_id": "safe-file-read-001",
+                                        "confidence": 0.95,
+                                        "processing_time_ms": 45,
+                                        "ai_provider": "anthropic",
+                                        "ai_model": "claude-3-sonnet",
+                                        "risk_factors": [],
+                                        "requires_approval": False,
+                                    },
+                                },
+                                "deny_decision": {
+                                    "summary": "Tool request denied",
+                                    "value": {
+                                        "action": "deny",
+                                        "reason": "Attempt to delete system files detected",
+                                        "rule_id": "system-protection-001",
+                                        "confidence": 0.99,
+                                        "processing_time_ms": 23,
+                                        "ai_provider": "anthropic",
+                                        "ai_model": "claude-3-sonnet",
+                                        "risk_factors": [
+                                            "system_file_deletion",
+                                            "sudo_escalation",
+                                        ],
+                                        "requires_approval": False,
+                                    },
+                                },
+                                "sample_decision": {
+                                    "summary": "Tool request requires evaluation",
+                                    "value": {
+                                        "action": "sample",
+                                        "reason": "External API call requires human review",
+                                        "rule_id": "network-eval-001",
+                                        "confidence": 0.7,
+                                        "processing_time_ms": 156,
+                                        "ai_provider": "anthropic",
+                                        "ai_model": "claude-3-sonnet",
+                                        "risk_factors": [
+                                            "external_api",
+                                            "authentication_header",
+                                        ],
+                                        "requires_approval": True,
+                                        "ai_evaluation": {
+                                            "risk_level": "medium",
+                                            "recommended_action": "require_approval",
+                                            "analysis": "External API with auth token - verify endpoint safety",
+                                        },
+                                    },
+                                },
+                            }
+                        }
+                    },
+                },
+                400: {"description": "Invalid request parameters"},
+                500: {"description": "Internal evaluation error"},
+            },
+        )
         async def evaluate_tool_request(request: EvaluateRequest) -> Decision:
             """Evaluate a tool request for security concerns.
 
@@ -208,7 +340,110 @@ class HTTPTransport:
 
                 return fallback_decision
 
-        @self.app.post("/v1/hooks", response_model=PreToolUseOutput)
+        @self.app.post(
+            "/v1/hooks",
+            response_model=PreToolUseOutput,
+            summary="Evaluate Claude Code hook request",
+            description="Processes Claude Code PreToolUse hook events and returns permission decisions.",
+            openapi_extra={
+                "examples": {
+                    "claude_file_read": {
+                        "summary": "Claude Code file read hook",
+                        "description": "Hook triggered when Claude Code attempts to read a file",
+                        "value": {
+                            "session_id": "claude_sess_123",
+                            "transcript_path": "/tmp/claude_transcript_123.json",
+                            "cwd": "/home/user/documents",
+                            "hook_event_name": "PreToolUse",
+                            "tool_name": "Read",
+                            "tool_input": {
+                                "file_path": "/home/user/documents/report.md",
+                                "limit": 100,
+                            },
+                        },
+                    },
+                    "claude_git_operation": {
+                        "summary": "Claude Code git operation hook",
+                        "description": "Hook triggered when Claude Code executes git commands",
+                        "value": {
+                            "session_id": "claude_sess_456",
+                            "transcript_path": "/tmp/claude_transcript_456.json",
+                            "cwd": "/home/user/myproject",
+                            "hook_event_name": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {
+                                "command": "git add . && git commit -m 'Update documentation'",
+                                "description": "Commit documentation changes",
+                            },
+                        },
+                    },
+                    "claude_dangerous_command": {
+                        "summary": "Claude Code dangerous command hook",
+                        "description": "Hook triggered when Claude Code attempts risky operations",
+                        "value": {
+                            "session_id": "claude_sess_789",
+                            "transcript_path": "/tmp/claude_transcript_789.json",
+                            "cwd": "/tmp",
+                            "hook_event_name": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {
+                                "command": "curl -X DELETE https://api.production.com/delete-all",
+                                "description": "Delete production data",
+                            },
+                        },
+                    },
+                }
+            },
+            responses={
+                200: {
+                    "description": "Hook evaluation completed successfully",
+                    "content": {
+                        "application/json": {
+                            "examples": {
+                                "allow_response": {
+                                    "summary": "Operation allowed",
+                                    "value": {
+                                        "hookSpecificOutput": {
+                                            "hookEventName": "PreToolUse",
+                                            "permissionDecision": "allow",
+                                            "permissionDecisionReason": "Safe file read operation in user directory",
+                                        },
+                                        "decision": "approve",
+                                        "reason": "Safe file read operation in user directory",
+                                    },
+                                },
+                                "deny_response": {
+                                    "summary": "Operation denied",
+                                    "value": {
+                                        "hookSpecificOutput": {
+                                            "hookEventName": "PreToolUse",
+                                            "permissionDecision": "deny",
+                                            "permissionDecisionReason": "Dangerous command detected: potential data deletion",
+                                        },
+                                        "decision": "block",
+                                        "reason": "Dangerous command detected: potential data deletion",
+                                    },
+                                },
+                                "ask_response": {
+                                    "summary": "User approval required",
+                                    "value": {
+                                        "hookSpecificOutput": {
+                                            "hookEventName": "PreToolUse",
+                                            "permissionDecision": "ask",
+                                            "permissionDecisionReason": "Git commit requires confirmation - review changes before proceeding",
+                                        },
+                                        "decision": "approve",
+                                        "reason": "Git commit requires confirmation - review changes before proceeding",
+                                    },
+                                },
+                            }
+                        }
+                    },
+                },
+                400: {"description": "Invalid hook request format"},
+                500: {"description": "Hook evaluation error"},
+            },
+        )
         async def evaluate_hook_request(request: PreToolUseInput) -> PreToolUseOutput:
             """Evaluate a Claude Code PreToolUse hook request.
 
@@ -307,7 +542,82 @@ class HTTPTransport:
                     reason=f"Evaluation error: {str(e)}",
                 )
 
-        @self.app.get("/v1/health", response_model=HealthResponse)
+        @self.app.get(
+            "/v1/health",
+            response_model=HealthResponse,
+            summary="Check service health status",
+            description="Returns the current health status of the Superego service and its components.",
+            responses={
+                200: {
+                    "description": "Health check completed successfully",
+                    "content": {
+                        "application/json": {
+                            "examples": {
+                                "healthy_response": {
+                                    "summary": "All systems healthy",
+                                    "value": {
+                                        "status": "healthy",
+                                        "timestamp": "2024-01-15T10:30:00Z",
+                                        "components": {
+                                            "security_policy": {
+                                                "status": "healthy",
+                                                "message": "Security rules loaded successfully",
+                                                "last_check": "2024-01-15T10:29:55Z",
+                                            },
+                                            "ai_service": {
+                                                "status": "healthy",
+                                                "message": "AI provider responding normally",
+                                                "last_check": "2024-01-15T10:29:58Z",
+                                            },
+                                            "audit_logger": {
+                                                "status": "healthy",
+                                                "message": "Audit trail operational",
+                                                "last_check": "2024-01-15T10:29:59Z",
+                                            },
+                                            "system_metrics": {
+                                                "status": "healthy",
+                                                "message": "System resources within normal limits",
+                                                "last_check": "2024-01-15T10:30:00Z",
+                                            },
+                                        },
+                                    },
+                                },
+                                "degraded_response": {
+                                    "summary": "Service degraded but operational",
+                                    "value": {
+                                        "status": "degraded",
+                                        "timestamp": "2024-01-15T10:30:00Z",
+                                        "components": {
+                                            "security_policy": {
+                                                "status": "healthy",
+                                                "message": "Security rules loaded successfully",
+                                                "last_check": "2024-01-15T10:29:55Z",
+                                            },
+                                            "ai_service": {
+                                                "status": "degraded",
+                                                "message": "AI provider experiencing high latency",
+                                                "last_check": "2024-01-15T10:29:45Z",
+                                            },
+                                            "audit_logger": {
+                                                "status": "healthy",
+                                                "message": "Audit trail operational",
+                                                "last_check": "2024-01-15T10:29:59Z",
+                                            },
+                                            "system_metrics": {
+                                                "status": "degraded",
+                                                "message": "High memory usage detected",
+                                                "last_check": "2024-01-15T10:30:00Z",
+                                            },
+                                        },
+                                    },
+                                },
+                            }
+                        }
+                    },
+                },
+                500: {"description": "Health check failed"},
+            },
+        )
         async def health_check() -> HealthResponse:
             """Check the health of the Superego service.
 
@@ -412,7 +722,7 @@ class HTTPTransport:
             """
             return {
                 "name": "superego-mcp",
-                "version": "0.1.0",
+                "version": "0.0.0",
                 "description": "Intelligent tool request interception for AI agents",
                 "transport": "http",
                 "endpoints": {

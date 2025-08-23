@@ -1,0 +1,24 @@
+{
+  "assets": {
+    "directories": {
+      "config": {
+        "file_count": 5,
+        "size_bytes": 18984
+      },
+      "demo_config": {
+        "file_count": 6,
+        "size_bytes": 23150
+      }
+    },
+    "total_files": 11,
+    "total_size_bytes": 42134,
+    "total_size_kb": 41.15
+  },
+  "build_branch": "feat/python-mcp-docker",
+  "build_commit": "e0fcc83abd3d48219a5c013364ab92133e58475f",
+  "build_platform": "darwin",
+  "build_timestamp": "2025-08-21T03:39:01.951253Z",
+  "build_version": "standard",
+  "hatchling_version": "unknown",
+  "python_version": "3.13.5"
+}

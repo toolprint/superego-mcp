@@ -1,0 +1,61 @@
+{
+  "scenarios": [
+    {
+      "id": "safe_001",
+      "name": "List Directory Contents",
+      "description": "Basic directory listing operation using ls command",
+      "tool_name": "ls",
+      "parameters": {
+        "path": "/home/user/documents"
+      },
+      "expected_action": "allow",
+      "tags": ["file_system", "safe", "read_only", "directory_listing"]
+    },
+    {
+      "id": "safe_002",
+      "name": "Git Status Check",
+      "description": "Check git repository status for uncommitted changes",
+      "tool_name": "git",
+      "parameters": {
+        "subcommand": "status",
+        "args": ["--porcelain"]
+      },
+      "expected_action": "allow",
+      "tags": ["version_control", "safe", "read_only", "git_status"]
+    },
+    {
+      "id": "safe_003",
+      "name": "Read File Contents",
+      "description": "Display file contents using cat command",
+      "tool_name": "cat",
+      "parameters": {
+        "file": "/var/log/application.log"
+      },
+      "expected_action": "allow",
+      "tags": ["file_system", "safe", "read_only", "file_reading"]
+    },
+    {
+      "id": "safe_004",
+      "name": "Check Process Status",
+      "description": "View running processes with ps command",
+      "tool_name": "ps",
+      "parameters": {
+        "args": ["aux"]
+      },
+      "expected_action": "allow",
+      "tags": ["system_info", "safe", "read_only", "process_monitoring"]
+    },
+    {
+      "id": "safe_005",
+      "name": "View File Permissions",
+      "description": "List files with detailed permissions using ls -la",
+      "tool_name": "ls",
+      "parameters": {
+        "path": "/usr/local/bin",
+        "args": ["-la"]
+      },
+      "expected_action": "allow",
+      "tags": ["file_system", "safe", "read_only", "permissions_check"]
+    }
+  ]
+}

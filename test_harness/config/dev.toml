@@ -1,0 +1,57 @@
+# Test Harness Development Configuration
+# This file contains development-specific overrides for the test harness
+
+[server]
+# Development server usually runs on port 8000
+base_url = "http://localhost:8000"
+# Shorter timeout for faster feedback during development
+timeout = 10
+
+[scenarios]
+# Unique agent ID for development testing
+agent_id = "dev-agent"
+# Development session prefix
+session_prefix = "dev-session"
+# Shorter timeouts for faster development cycles
+scenario_timeout = 30
+# Reduced concurrency for easier debugging
+max_concurrent = 2
+
+[load_testing]
+# Lighter load testing for development
+concurrent = 2
+duration = 30
+ramp_up = 5
+target_rps = 10
+# More lenient response time for development
+max_response_time = 2000
+
+[output]
+# More detailed output for development
+verbose = true
+# Always save results in development
+save_results = true
+results_file = "dev_test_results.json"
+
+[logging]
+# Debug level logging for development
+level = "DEBUG"
+# Log to file for easier debugging
+file = "test_harness.log"
+# Enable request/response logging for debugging
+log_requests = true
+
+[validation]
+# Permissive validation during development
+mode = "permissive"
+
+[environment]
+# Development environment settings
+type = "development"
+# Development-specific test data
+data_dir = "test_data/dev"
+# Don't cleanup in development for debugging
+cleanup = false
+
+# Development environment variables
+variables = { DEBUG = "1", TESTING = "1" }

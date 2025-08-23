@@ -1,0 +1,13 @@
+{
+  "config/minimal_rules.yaml": "fb1fe7aa47479c63",
+  "config/rules-inference-example.yaml": "20158ff751941ce4",
+  "config/rules.yaml": "b0bdd04266aa0a10",
+  "config/server-cli-example.yaml": "32c2ab64110ca2b1",
+  "config/server.yaml": "3b04f0fcbd1097c8",
+  "demo_config/claude-code/claude-hooks-config.json": "205ff259efe46ba4",
+  "demo_config/fastagent/fastagent.config.anthropic.yaml": "9b0b23b24ed8ded1",
+  "demo_config/fastagent/fastagent.config.openai.yaml": "98bbeac5076d9a5c",
+  "demo_config/superego/claude-code-demo.yaml": "ca0b26ecd646dda2",
+  "demo_config/superego/rules-cli-demo.yaml": "a2bca56893d096fb",
+  "demo_config/superego/rules.yaml": "4ea0e0949677c38d"
+}

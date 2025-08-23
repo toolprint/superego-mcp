@@ -1,0 +1,400 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main, develop]
+    tags: [v*]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: 'Force publish to registry'
+        required: false
+        default: false
+        type: boolean
+
+# Required permissions for GHCR push
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # Code quality and testing job
+  test:
+    name: Test and Quality Checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for version detection
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
+    
+    - name: Install dependencies
+      run: |
+        uv sync --all-extras
+    
+    - name: Run linting
+      run: |
+        uv run ruff check src/ tests/
+        uv run ruff format --check src/ tests/
+    
+    - name: Run type checking
+      run: |
+        uv run mypy src/
+    
+    - name: Run tests with coverage
+      run: |
+        uv run pytest --cov=superego_mcp --cov-report=xml --cov-report=term-missing
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: matrix.python-version == '3.12'
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+    
+    - name: Test package build
+      run: |
+        uv build
+        # Test wheel installation in clean environment
+        python -m venv test-env
+        test-env/bin/pip install dist/*.whl
+        test-env/bin/superego --version
+        test-env/bin/superego --help
+    
+    - name: Security audit
+      run: |
+        uv run pip-audit --format=json --output=security-audit.json --desc || true
+        if [ -f security-audit.json ]; then
+          cat security-audit.json
+        fi
+    
+    - name: Upload security audit results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-audit-${{ matrix.python-version }}
+        path: security-audit.json
+        retention-days: 30
+
+  # Optimized multi-platform Docker build with cross-compilation
+  build:
+    name: Build Multi-Platform Container Images
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-metadata: ${{ steps.meta.outputs.json }}
+      image-version: ${{ steps.meta.outputs.version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up QEMU for multi-platform builds
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+    
+    - name: Set up Docker Buildx with enhanced configuration
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
+        driver-opts: |
+          network=host
+        buildkitd-flags: |
+          --allow-insecure-entitlement security.insecure
+          --allow-insecure-entitlement network.host
+        buildkitd-config: .github/buildkitd.toml  # Performance settings including max-parallelism
+    
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,format=long
+          type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          org.opencontainers.image.title=Superego MCP Server
+          org.opencontainers.image.description=Intelligent tool-call review system for AI agents
+          org.opencontainers.image.vendor=toolprint
+          org.opencontainers.image.licenses=MIT
+    
+    - name: Build and push multi-platform Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/production/Dockerfile
+        platforms: linux/amd64
+        push: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.force_publish) }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: |
+          type=gha,scope=multiarch-deps
+          type=gha,scope=multiarch-runtime
+          ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}/{1}:cache', env.REGISTRY, env.IMAGE_NAME) || '' }}
+        cache-to: |
+          type=gha,scope=multiarch-deps,mode=max
+          type=gha,scope=multiarch-runtime,mode=max
+          ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}/{1}:cache,mode=max', env.REGISTRY, env.IMAGE_NAME) || '' }}
+        provenance: ${{ github.event_name != 'pull_request' }}
+        sbom: ${{ github.event_name != 'pull_request' }}
+        load: ${{ github.event_name == 'pull_request' }}
+    
+    - name: Add build summary
+      if: github.event_name != 'pull_request'
+      run: |
+        echo "## 🚀 Container Build Completed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms**: linux/amd64" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Strategy**: Native AMD64 build" >> $GITHUB_STEP_SUMMARY
+        echo "- **Cache Strategy**: GitHub Actions cache" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Digest**: ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+
+
+  # Security scanning with Trivy
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    continue-on-error: true  # Don't fail the workflow on security issues, but report them
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,format=long
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        exit-code: '0'  # Don't fail on vulnerabilities, just report
+        trivy-config: 'trivy.yaml'  # Use our enhanced Trivy configuration
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Run Trivy for human-readable output
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+        format: 'table'
+        output: 'trivy-results.txt'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        exit-code: '0'
+        trivy-config: 'trivy.yaml'  # Use our enhanced Trivy configuration
+    
+    - name: Upload vulnerability scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: trivy-vulnerability-results
+        path: |
+          trivy-results.sarif
+          trivy-results.txt
+        retention-days: 30
+    
+    - name: Check for critical vulnerabilities
+      run: |
+        echo "Checking for critical vulnerabilities..."
+        if grep -q "CRITICAL" trivy-results.txt; then
+          echo "::warning::Critical vulnerabilities found in container image"
+          echo "::warning::Please review the security scan results"
+        else
+          echo "No critical vulnerabilities found"
+        fi
+
+  # Container validation and testing
+  container-test:
+    name: Container Validation
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        platform: [linux/amd64]  # Test on primary platform
+    
+    steps:
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,format=long
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Test container startup
+      run: |
+        docker run --rm --platform ${{ matrix.platform }} \
+          -e SUPEREGO_CONFIG_PATH=/dev/null \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
+          superego --version
+    
+    - name: Test container health check
+      run: |
+        # Start container in background
+        container_id=$(docker run -d --platform ${{ matrix.platform }} \
+          -p 8080:8000 \
+          -e SUPEREGO_CONFIG_PATH=/dev/null \
+          -e SUPEREGO_PORT=8000 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }})
+        
+        # Wait for container to start
+        echo "Waiting for container to start..."
+        sleep 30
+        
+        # Check health endpoint
+        echo "Testing health endpoint..."
+        curl -f http://localhost:8080/health || (docker logs $container_id && exit 1)
+        
+        # Clean up
+        docker stop $container_id
+        docker rm $container_id
+    
+    - name: Test container CLI functionality
+      run: |
+        echo '{"tool_name": "ls", "tool_input": {"directory": "/tmp"}, "session_id": "test", "transcript_path": "", "cwd": "/tmp", "hook_event_name": "PreToolUse"}' | \
+        docker run --rm -i --platform ${{ matrix.platform }} \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
+          superego advise
+
+  # Deployment summary and notifications
+  deploy-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [test, build, security-scan, container-test]
+    if: always() && github.event_name != 'pull_request'
+    
+    steps:
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,format=long
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Create deployment summary
+      run: |
+        echo "# Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Container Image" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms**: linux/amd64" >> $GITHUB_STEP_SUMMARY
+        echo "- **Registry**: ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Build Status" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tests**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Security Scan**: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Container Test**: ${{ needs.container-test.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Usage" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "# Pull and run the container" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Report deployment status
+      if: failure()
+      run: |
+        echo "::error::Deployment failed. Check the logs for details."
+        exit 1
+    
+    - name: Report success
+      if: success()
+      run: |
+        echo "::notice::Deployment completed successfully!"
+        echo "::notice::Container image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+
+  # Cleanup old packages (optional)
+  cleanup:
+    name: Cleanup Old Packages
+    runs-on: ubuntu-latest
+    needs: deploy-summary
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    continue-on-error: true
+    
+    steps:
+    - name: Delete old container images
+      uses: actions/delete-package-versions@v5
+      with:
+        package-name: ${{ github.event.repository.name }}
+        package-type: container
+        min-versions-to-keep: 10
+        delete-only-untagged-versions: true
+        token: ${{ secrets.GITHUB_TOKEN }}

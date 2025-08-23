@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "description": "Intercept all MCP tool calls for security evaluation",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["/Users/brian/workspace/toolprint/superego-mcp/demo/hooks/security_hook.py"],
+            "timeout": 15,
+            "description": "Send tool call to Superego MCP for security evaluation"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "description": "Log completed MCP tool executions for audit",
+        "hooks": [
+          {
+            "type": "command", 
+            "command": "python",
+            "args": ["/Users/brian/workspace/toolprint/superego-mcp/demo/hooks/audit_hook.py"],
+            "timeout": 5,
+            "description": "Log tool execution result for security audit"
+          }
+        ]
+      }
+    ]
+  }
+}

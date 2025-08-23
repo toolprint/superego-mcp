@@ -1,0 +1,246 @@
+# Prometheus Alerting Rules for Superego MCP Server
+# Production-ready alerting rules for monitoring and incident response
+
+groups:
+  - name: superego.health
+    interval: 30s
+    rules:
+      # Service availability alerts
+      - alert: SuperegoMCPDown
+        expr: up{job="superego-mcp"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: superego-mcp
+          component: health
+        annotations:
+          summary: "Superego MCP Server is down"
+          description: "Superego MCP Server has been down for more than 1 minute. Check service status and logs."
+          runbook_url: "https://docs.superego-mcp.com/runbooks/service-down"
+
+      - alert: SuperegoMCPHealthCheckFailing
+        expr: superego_health_check_status != 1
+        for: 2m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: health
+        annotations:
+          summary: "Superego MCP Server health check failing"
+          description: "Health check endpoint is returning non-healthy status for {{ $labels.instance }}"
+
+      # High error rate alerts
+      - alert: SuperegoHighErrorRate
+        expr: rate(superego_http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: http
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for instance {{ $labels.instance }}"
+
+      - alert: SuperegoVeryHighErrorRate
+        expr: rate(superego_http_requests_total{status=~"5.."}[5m]) > 0.3
+        for: 1m
+        labels:
+          severity: critical
+          service: superego-mcp
+          component: http
+        annotations:
+          summary: "Very high error rate detected"
+          description: "Critical error rate is {{ $value | humanizePercentage }} for instance {{ $labels.instance }}"
+
+  - name: superego.performance
+    interval: 30s
+    rules:
+      # Response time alerts
+      - alert: SuperegoHighLatency
+        expr: histogram_quantile(0.95, rate(superego_request_duration_seconds_bucket[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: performance
+        annotations:
+          summary: "High response latency"
+          description: "95th percentile latency is {{ $value }}s for instance {{ $labels.instance }}"
+
+      - alert: SuperegoVeryHighLatency
+        expr: histogram_quantile(0.95, rate(superego_request_duration_seconds_bucket[5m])) > 5.0
+        for: 2m
+        labels:
+          severity: critical
+          service: superego-mcp
+          component: performance
+        annotations:
+          summary: "Very high response latency"
+          description: "95th percentile latency is {{ $value }}s for instance {{ $labels.instance }}"
+
+      # Throughput alerts
+      - alert: SuperegoLowThroughput
+        expr: rate(superego_http_requests_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: performance
+        annotations:
+          summary: "Low request throughput"
+          description: "Request rate is {{ $value }} requests/second for instance {{ $labels.instance }}"
+
+  - name: superego.resources
+    interval: 30s
+    rules:
+      # Memory usage alerts
+      - alert: SuperegoHighMemoryUsage
+        expr: superego_memory_usage_bytes / superego_memory_limit_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: resources
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} for instance {{ $labels.instance }}"
+
+      - alert: SuperegoCriticalMemoryUsage
+        expr: superego_memory_usage_bytes / superego_memory_limit_bytes > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          service: superego-mcp
+          component: resources
+        annotations:
+          summary: "Critical memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} for instance {{ $labels.instance }}"
+
+      # CPU usage alerts
+      - alert: SuperegoHighCPUUsage
+        expr: rate(superego_cpu_usage_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: resources
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }} for instance {{ $labels.instance }}"
+
+  - name: superego.ai_service
+    interval: 30s
+    rules:
+      # AI service availability
+      - alert: SuperegoAIServiceDown
+        expr: superego_ai_service_available != 1
+        for: 2m
+        labels:
+          severity: critical
+          service: superego-mcp
+          component: ai_service
+        annotations:
+          summary: "AI service unavailable"
+          description: "AI service is not responding for instance {{ $labels.instance }}"
+
+      # AI service error rate
+      - alert: SuperegoAIHighErrorRate
+        expr: rate(superego_ai_requests_total{status="error"}[5m]) / rate(superego_ai_requests_total[5m]) > 0.2
+        for: 3m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: ai_service
+        annotations:
+          summary: "High AI service error rate"
+          description: "AI service error rate is {{ $value | humanizePercentage }} for instance {{ $labels.instance }}"
+
+      # AI service latency
+      - alert: SuperegoAIHighLatency
+        expr: histogram_quantile(0.95, rate(superego_ai_request_duration_seconds_bucket[5m])) > 30.0
+        for: 5m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: ai_service
+        annotations:
+          summary: "High AI service latency"
+          description: "95th percentile AI request latency is {{ $value }}s for instance {{ $labels.instance }}"
+
+  - name: superego.security
+    interval: 30s
+    rules:
+      # Security event alerts
+      - alert: SuperegoSecurityViolation
+        expr: increase(superego_security_violations_total[5m]) > 5
+        for: 0s
+        labels:
+          severity: critical
+          service: superego-mcp
+          component: security
+        annotations:
+          summary: "Multiple security violations detected"
+          description: "{{ $value }} security violations in the last 5 minutes for instance {{ $labels.instance }}"
+
+      # Rate limiting alerts
+      - alert: SuperegoRateLimitExceeded
+        expr: increase(superego_rate_limit_exceeded_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: security
+        annotations:
+          summary: "Rate limit exceeded frequently"
+          description: "Rate limit exceeded {{ $value }} times in the last 5 minutes for instance {{ $labels.instance }}"
+
+      # Authentication failures
+      - alert: SuperegoAuthFailures
+        expr: increase(superego_auth_failures_total[5m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+          service: superego-mcp
+          component: security
+        annotations:
+          summary: "Multiple authentication failures"
+          description: "{{ $value }} authentication failures in the last 5 minutes for instance {{ $labels.instance }}"
+
+  - name: superego.dependencies
+    interval: 30s
+    rules:
+      # Redis availability
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+          component: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache service is unavailable"
+
+      # Nginx availability
+      - alert: NginxDown
+        expr: up{job="nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: nginx
+          component: reverse-proxy
+        annotations:
+          summary: "Nginx is down"
+          description: "Nginx reverse proxy is unavailable"
+
+      # High Nginx error rate
+      - alert: NginxHighErrorRate
+        expr: rate(nginx_http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: nginx
+          component: reverse-proxy
+        annotations:
+          summary: "High Nginx error rate"
+          description: "Nginx error rate is {{ $value | humanizePercentage }}"

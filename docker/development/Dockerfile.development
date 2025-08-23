@@ -1,0 +1,84 @@
+# Development Dockerfile for Superego MCP Server
+# Optimized for hot-reload and debugging with fast iteration cycle
+# Target: <15s startup, <5s reload, <1GB image size
+
+# Use Python slim image for smaller base size
+FROM python:3.12-slim AS base
+
+# Install system dependencies in one layer to minimize image size
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Essential tools only
+    git curl \
+    # Build tools for Python packages
+    gcc g++ build-essential \
+    # Process monitoring
+    procps \
+    # Node.js for Claude CLI
+    nodejs npm \
+    # Clean up in same layer
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && apt-get autoclean
+
+# Set working directory
+WORKDIR /app
+
+# Environment variables optimized for performance
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app/src \
+    DEVELOPMENT=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    UV_CACHE_DIR=/tmp/.uv-cache \
+    UV_COMPILE_BYTECODE=1
+
+# Install UV using the official installer in a global location
+ADD https://astral.sh/uv/install.sh /install.sh
+RUN chmod +x /install.sh && INSTALLER_NO_MODIFY_PATH=1 /install.sh && rm /install.sh
+RUN mv /root/.local/bin/uv /usr/local/bin/uv && mv /root/.local/bin/uvx /usr/local/bin/uvx
+
+# Install Claude Code CLI for inference provider support
+RUN npm install -g @anthropic-ai/claude-code && \
+    # Verify installation and create symlink if needed
+    (which claude || ln -s /usr/local/lib/node_modules/@anthropic-ai/claude-code/bin/claude /usr/local/bin/claude) && \
+    # Test the installation
+    claude --version || echo "Claude CLI installation needs manual verification"
+
+# Copy only necessary files for dependency installation
+COPY pyproject.toml uv.lock ./
+
+# Create a minimal project structure for UV sync to work
+RUN mkdir -p src/superego_mcp && echo '__version__ = "0.1.0"' > src/superego_mcp/__init__.py
+RUN echo "# Superego MCP Development" > README.md
+COPY hatch_build.py ./
+
+# Install dependencies without the project
+RUN uv sync --all-extras --dev --frozen --no-install-project
+
+# Install debugging tools directly in the virtual environment (as root)
+RUN uv pip install debugpy ipdb rich pytest-xdist pytest-watch
+
+# Create application user
+RUN groupadd -r appuser && \
+    useradd -r -g appuser -d /app -s /bin/bash appuser
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/logs /app/tmp /app/.debugger /app/.cache && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Copy application source (will be volume-mounted in development)
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser config/ ./config/
+
+# Expose ports
+EXPOSE 8000 8001 5678 8080
+
+# Optimized health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=2 \
+    CMD curl -sf http://localhost:8000/health || exit 1
+
+# Entry point that supports both development modes
+CMD ["uv", "run", "python", "-m", "superego_mcp.main"]

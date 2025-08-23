@@ -1,0 +1,109 @@
+# Test Harness Default Configuration
+# This file contains the default settings for the Superego MCP Test Harness
+
+[server]
+# Base URL for the Superego MCP server
+base_url = "http://localhost:8000"
+# Request timeout in seconds
+timeout = 30
+# Health check endpoint
+health_endpoint = "/health"
+# Retry configuration
+max_retries = 3
+retry_delay = 1.0
+
+[scenarios]
+# Default agent identifier for test scenarios
+agent_id = "test-agent"
+# Session prefix for test isolation
+session_prefix = "test-session"
+# Current working directory for test execution
+cwd = "."
+# Default scenario timeout in seconds
+scenario_timeout = 60
+# Maximum concurrent scenarios
+max_concurrent = 5
+
+[load_testing]
+# Number of concurrent connections for load testing
+concurrent = 10
+# Test duration in seconds
+duration = 60
+# Ramp-up time in seconds (gradual increase of load)
+ramp_up = 10
+# Target requests per second
+target_rps = 100
+# Maximum response time threshold in milliseconds
+max_response_time = 1000
+
+[output]
+# Output format: "json", "table", "summary"
+format = "table"
+# Enable colored output
+colors = true
+# Verbose output mode
+verbose = false
+# Save results to file
+save_results = false
+# Results file path
+results_file = "test_results.json"
+
+[logging]
+# Log level: "DEBUG", "INFO", "WARNING", "ERROR"
+level = "INFO"
+# Log format: "text", "json"
+format = "text"
+# Log file path (empty for stdout only)
+file = ""
+# Enable request/response logging
+log_requests = false
+
+[auth]
+# Authentication method: "none", "bearer", "api_key"
+method = "none"
+# API key for authentication (when method is "api_key")
+api_key = ""
+# Bearer token for authentication (when method is "bearer")
+bearer_token = ""
+# Custom headers for authentication
+headers = {}
+
+[validation]
+# Enable response schema validation
+enabled = true
+# Schema validation mode: "strict", "permissive"
+mode = "strict"
+# Custom validation rules file path
+rules_file = ""
+
+[client]
+# HTTP client timeout in seconds
+timeout = 30
+# Connection pool size
+pool_size = 100
+# Keep-alive timeout in seconds
+keepalive_timeout = 30
+# Enable HTTP/2
+http2 = false
+# SSL verification
+verify_ssl = true
+
+[metrics]
+# Enable metrics collection
+enabled = true
+# Metrics export format: "prometheus", "json"
+export_format = "json"
+# Metrics collection interval in seconds
+interval = 5
+# Custom metrics to collect
+custom_metrics = []
+
+[environment]
+# Environment variables to set for tests
+variables = {}
+# Environment type: "development", "staging", "production"
+type = "development"
+# Test data directory
+data_dir = "test_data"
+# Cleanup after tests
+cleanup = true

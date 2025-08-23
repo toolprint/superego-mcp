@@ -1,0 +1,215 @@
+# Development Docker Compose Configuration
+# Optimized for hot-reload development workflow with debugging support
+# Meets <15s startup and <5s hot-reload requirements
+
+services:
+  superego-dev:
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile.development
+    image: superego-mcp-dev:latest
+    container_name: superego-mcp-dev
+    restart: unless-stopped
+    
+    # Port mappings for development services
+    ports:
+      - "8002:8000"    # Main HTTP server (using 8002 to avoid conflicts)
+      - "8003:8001"    # Monitoring dashboard
+      - "5679:5678"    # Remote debugging (debugpy)
+      - "8082:8080"    # Alternative HTTP port
+    
+    # Environment variables optimized for development workflow
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONPATH=/app/src
+      - DEVELOPMENT=1
+      - LOG_LEVEL=DEBUG
+      - HOT_RELOAD=1
+      - SUPEREGO_CONFIG_PATH=/app/config/server.yaml
+      - SUPEREGO_RULES_PATH=/app/config/rules.yaml
+      # UV optimization for faster package operations
+      - UV_CACHE_DIR=/app/.cache/uv
+      - UV_PYTHON=/usr/local/bin/python
+      # Debugging configuration
+      - DEBUGPY_ENABLED=${DEBUGPY_ENABLED:-0}  # Set to 1 to enable remote debugging
+      - DEBUGPY_PORT=5678
+      - DEBUGPY_WAIT_FOR_CLIENT=${DEBUGPY_WAIT_FOR_CLIENT:-0}  # Set to 1 to wait for debugger
+      # Performance optimization
+      - PYTHONHASHSEED=0
+      - PYTHONFAULTHANDLER=1
+      # Claude CLI inference provider (supports both auth methods)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}  # API key authentication
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}  # OAuth token authentication
+      # Explicit logging configuration for dev Docker
+      - SUPEREGO_LOG_FORMAT=console  # Rich console output for development
+      - SUPEREGO_LOG_HANDLER=write   # WriteLogger for Docker containers (prevents I/O errors)
+    
+    # Volume mounts optimized for <5s hot-reload performance
+    volumes:
+      # Source code with delegated consistency for faster file sync
+      - ./src:/app/src:delegated
+      - ./config:/app/config:delegated
+      - ./tests:/app/tests:delegated
+      - ./demo:/app/demo:delegated
+      
+      # Configuration files (read-only for safety)
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./uv.lock:/app/uv.lock:ro
+      - ./justfile:/app/justfile:ro
+      
+      # Development artifacts with named volumes for performance
+      - superego-dev-logs:/app/logs
+      - superego-dev-tmp:/app/tmp
+      - superego-dev-cache:/app/.cache
+      
+      # IDE integration directory (optional)
+      - ./.debugger:/app/.debugger:cached
+    
+    # Optimized development command
+    command: >
+      bash -c "
+        echo 'Starting Superego MCP Server (Development Mode)';
+        echo 'Hot-reload: src/, config/, tests/';
+        echo 'Debug port: 5678 (debugpy)';
+        echo 'Server: http://localhost:8000';
+        echo 'Monitor: http://localhost:8001';
+        
+        if [ \"$$DEBUGPY_ENABLED\" = \"1\" ]; then
+          echo 'Remote debugging enabled on port 5678';
+          if [ \"$$DEBUGPY_WAIT_FOR_CLIENT\" = \"1\" ]; then
+            echo 'Waiting for debugger client...';
+            uv run python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m superego_mcp.main;
+          else
+            echo 'Debugger available (non-blocking)';
+            uv run python -m debugpy --listen 0.0.0.0:5678 -m superego_mcp.main;
+          fi;
+        else
+          echo 'Starting with hot-reload optimization';
+          uv run python -m superego_mcp.main;
+        fi
+      "
+    
+    # Health check optimized for development
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s  # Allow extra time for development startup
+    
+    # Development networking
+    networks:
+      - superego-dev
+    
+    # Resource limits optimized for development performance
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'  # Allow more CPU for faster builds and reloads
+          memory: 3G   # Generous memory for debugging and hot-reload
+        reservations:
+          cpus: '1.0'  # Higher baseline for better performance
+          memory: 1G
+  
+  # Development monitoring dashboard (optional)
+  monitoring-dev:
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile.development
+    image: superego-mcp-dev:latest
+    container_name: superego-monitoring-dev
+    restart: unless-stopped
+    profiles: ["monitoring", "full"]
+    
+    ports:
+      - "3000:3000"    # Monitoring dashboard
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEVELOPMENT=1
+      - SUPEREGO_SERVER_URL=http://superego-dev:8000
+      - UV_CACHE_DIR=/app/.cache/uv
+    
+    volumes:
+      - ./src:/app/src:delegated
+      - ./demo:/app/demo:delegated
+      - superego-dev-logs:/app/logs:ro
+      - superego-dev-cache:/app/.cache
+    
+    command: >
+      bash -c "
+        echo '📊 Starting development monitoring dashboard...';
+        echo '🌐 Dashboard: http://localhost:3000';
+        cd /app && uv run python -m demo.demo_dashboard --host 0.0.0.0 --port 3000 --debug
+      "
+    
+    depends_on:
+      superego-dev:
+        condition: service_healthy
+    
+    networks:
+      - superego-dev
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# Named volumes for development persistence and performance
+volumes:
+  superego-dev-logs:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=100m,uid=1000,gid=1000  # Match appuser
+  superego-dev-tmp:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=200m,uid=1000,gid=1000
+  superego-dev-cache:
+    driver: local  # Persistent cache for UV and other tools
+
+# Development network with custom configuration
+networks:
+  superego-dev:
+    driver: bridge
+    name: superego-dev-network
+    driver_opts:
+      # Optimize for local development performance
+      com.docker.network.bridge.name: superego-dev0
+      com.docker.network.driver.mtu: 1500
+
+# Development profiles for different workflows
+# Usage examples:
+#   docker-compose up                    # Basic server only
+#   docker-compose --profile full up     # Server + monitoring
+#   docker-compose --profile monitoring up monitoring-dev  # Monitoring only
+x-development-profiles:
+  # Profile: basic (default) - Just the main server for fast development
+  basic: &basic-profile
+    - superego-dev
+  
+  # Profile: monitoring - Add monitoring dashboard
+  monitoring: &monitoring-profile
+    - monitoring-dev
+      
+  # Profile: full - Complete development stack
+  full: &full-profile
+    - superego-dev
+    - monitoring-dev
+
+# Quick start commands (add to your shell aliases):
+# alias dev-start='docker-compose up'
+# alias dev-full='docker-compose --profile full up'
+# alias dev-debug='DEBUGPY_ENABLED=1 DEBUGPY_WAIT_FOR_CLIENT=1 docker-compose up'
+# alias dev-build='docker-compose build --no-cache'
+# alias dev-logs='docker-compose logs -f'
+# alias dev-shell='docker-compose exec superego-dev bash'

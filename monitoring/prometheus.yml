@@ -1,0 +1,152 @@
+# Prometheus Configuration for Superego MCP Server Monitoring
+# Comprehensive scraping configuration for production deployment
+
+global:
+  scrape_interval: 15s      # Set the scrape interval to every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+  scrape_timeout: 10s      # Scrape timeout
+  
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager)
+  external_labels:
+    monitor: 'superego-mcp-monitor'
+    environment: 'production'
+
+# Alertmanager configuration (uncomment when Alertmanager is added)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    
+  # Main Superego MCP Server
+  - job_name: 'superego-mcp'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['superego-mcp:8000']
+    metrics_path: /metrics
+    honor_labels: false
+    params:
+      format: ['prometheus']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: superego-mcp:8000
+    metric_relabel_configs:
+      # Add service label to all metrics
+      - target_label: service
+        replacement: superego-mcp
+      - target_label: component
+        replacement: mcp-server
+
+  # Redis monitoring
+  - job_name: 'redis'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: /metrics
+    # Note: Requires Redis exporter if detailed metrics are needed
+    # For now, we'll monitor Redis via superego-mcp service metrics
+
+  # Nginx monitoring
+  - job_name: 'nginx'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: /nginx_status
+    # Note: Requires nginx stub_status module configuration
+    honor_labels: false
+    metric_relabel_configs:
+      - target_label: service
+        replacement: nginx
+      - target_label: component
+        replacement: reverse-proxy
+
+  # Docker container monitoring (if cAdvisor is added)
+  # - job_name: 'cadvisor'
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #   metrics_path: /metrics
+  #   honor_labels: false
+  #   metric_relabel_configs:
+  #     - target_label: service
+  #       replacement: docker
+  #     - target_label: component
+  #       replacement: containers
+
+  # Node exporter for system metrics (if added)
+  # - job_name: 'node'
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #   metrics_path: /metrics
+  #   honor_labels: false
+  #   metric_relabel_configs:
+  #     - target_label: service
+  #       replacement: system
+  #     - target_label: component
+  #       replacement: host-metrics
+
+  # Custom application metrics scraping
+  - job_name: 'superego-custom-metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['superego-mcp:8000']
+    metrics_path: /metrics/custom
+    honor_labels: true
+    params:
+      format: ['prometheus']
+      detailed: ['true']
+    relabel_configs:
+      # Preserve original instance label
+      - source_labels: [__address__]
+        target_label: __tmp_address
+      - source_labels: [__tmp_address]
+        regex: '([^:]+):.*'
+        target_label: instance
+        replacement: '${1}'
+    metric_relabel_configs:
+      # Add custom labels for different metric types
+      - source_labels: [__name__]
+        regex: 'superego_security_.*'
+        target_label: metric_category
+        replacement: 'security'
+      - source_labels: [__name__]
+        regex: 'superego_performance_.*'
+        target_label: metric_category
+        replacement: 'performance'
+      - source_labels: [__name__]
+        regex: 'superego_ai_.*'
+        target_label: metric_category
+        replacement: 'ai_service'
+      - source_labels: [__name__]
+        regex: 'superego_mcp_.*'
+        target_label: metric_category
+        replacement: 'mcp_protocol'
+
+# Storage configuration
+# Adjust retention and storage paths as needed
+# storage:
+#   tsdb:
+#     retention.time: 30d
+#     retention.size: 10GB
+#     path: /prometheus/data

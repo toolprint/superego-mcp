@@ -1,0 +1,438 @@
+# Security Monitoring and Alerting Configuration
+# Comprehensive security monitoring rules and alert definitions
+
+# Prometheus Alert Rules for Security Monitoring
+prometheus_alerts:
+  groups:
+    - name: superego_security
+      interval: 30s
+      rules:
+        # Authentication and Authorization Alerts
+        - alert: HighAuthFailureRate
+          expr: rate(superego_auth_failures_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+            category: security
+            component: authentication
+          annotations:
+            summary: "High authentication failure rate detected"
+            description: "Authentication failures are occurring at {{ $value }} per second for the last 5 minutes"
+            runbook_url: "https://wiki.company.com/runbooks/auth-failures"
+        
+        - alert: SuspiciousLoginPattern
+          expr: increase(superego_auth_failures_total[1h]) > 50
+          for: 0m
+          labels:
+            severity: critical
+            category: security
+            component: authentication
+          annotations:
+            summary: "Suspicious login pattern detected"
+            description: "More than 50 authentication failures in the last hour, potential brute force attack"
+            runbook_url: "https://wiki.company.com/runbooks/brute-force"
+        
+        - alert: UnauthorizedAccessAttempt
+          expr: rate(superego_unauthorized_requests_total[5m]) > 0.05
+          for: 1m
+          labels:
+            severity: warning
+            category: security
+            component: authorization
+          annotations:
+            summary: "Unauthorized access attempts detected"
+            description: "{{ $value }} unauthorized requests per second in the last 5 minutes"
+        
+        # Rate Limiting and DDoS Protection
+        - alert: RateLimitExceeded
+          expr: rate(superego_rate_limit_exceeded_total[5m]) > 1
+          for: 2m
+          labels:
+            severity: warning
+            category: security
+            component: rate_limiting
+          annotations:
+            summary: "Rate limit violations detected"
+            description: "Rate limit exceeded {{ $value }} times per second"
+        
+        - alert: DDoSAttackSuspected
+          expr: rate(superego_requests_total[1m]) > 100
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            component: ddos_protection
+          annotations:
+            summary: "Potential DDoS attack detected"
+            description: "Request rate is {{ $value }} per second, significantly above normal"
+            runbook_url: "https://wiki.company.com/runbooks/ddos-response"
+        
+        # Application Security
+        - alert: HighErrorRate
+          expr: rate(superego_errors_total[5m]) / rate(superego_requests_total[5m]) > 0.05
+          for: 3m
+          labels:
+            severity: warning
+            category: security
+            component: application
+          annotations:
+            summary: "High error rate detected"
+            description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+        
+        - alert: SecurityHeadersMissing
+          expr: rate(superego_security_headers_missing_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+            category: security
+            component: headers
+          annotations:
+            summary: "Security headers missing from responses"
+            description: "{{ $value }} responses per second are missing security headers"
+        
+        # Resource and Performance Security
+        - alert: ResourceExhaustion
+          expr: |
+            (
+              (superego_cpu_usage_percent > 90) or
+              (superego_memory_usage_percent > 90) or
+              (superego_disk_usage_percent > 90)
+            )
+          for: 2m
+          labels:
+            severity: critical
+            category: security
+            component: resources
+          annotations:
+            summary: "Resource exhaustion detected"
+            description: "System resources are critically low, potential DoS condition"
+        
+        - alert: UnusualTrafficPattern
+          expr: |
+            abs(
+              rate(superego_requests_total[5m]) - 
+              rate(superego_requests_total[1h] offset 1w)
+            ) > 50
+          for: 5m
+          labels:
+            severity: warning
+            category: security
+            component: traffic_analysis
+          annotations:
+            summary: "Unusual traffic pattern detected"
+            description: "Current traffic differs significantly from historical patterns"
+        
+        # Data Security
+        - alert: SensitiveDataExposure
+          expr: rate(superego_sensitive_data_exposed_total[5m]) > 0
+          for: 0m
+          labels:
+            severity: critical
+            category: security
+            component: data_protection
+          annotations:
+            summary: "Sensitive data exposure detected"
+            description: "Potential sensitive data leak detected in responses"
+            runbook_url: "https://wiki.company.com/runbooks/data-breach"
+        
+        - alert: UnencryptedConnection
+          expr: rate(superego_unencrypted_connections_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+            category: security
+            component: encryption
+          annotations:
+            summary: "Unencrypted connections detected"
+            description: "{{ $value }} unencrypted connections per second"
+        
+        # System Security
+        - alert: ContainerSecurityViolation
+          expr: rate(superego_container_security_violations_total[5m]) > 0
+          for: 0m
+          labels:
+            severity: critical
+            category: security
+            component: container
+          annotations:
+            summary: "Container security violation detected"
+            description: "Security policy violation in container runtime"
+        
+        - alert: FileSystemTamperDetected
+          expr: superego_file_integrity_violations_total > 0
+          for: 0m
+          labels:
+            severity: critical
+            category: security
+            component: integrity
+          annotations:
+            summary: "File system tampering detected"
+            description: "Critical files have been modified unexpectedly"
+            runbook_url: "https://wiki.company.com/runbooks/file-integrity"
+
+    - name: superego_infrastructure
+      interval: 60s
+      rules:
+        # Service Health
+        - alert: ServiceDown
+          expr: up{job="superego-mcp"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            category: availability
+            component: service
+          annotations:
+            summary: "Superego MCP service is down"
+            description: "Service has been down for more than 1 minute"
+        
+        - alert: ServiceHealthCheckFailing
+          expr: superego_health_check_success == 0
+          for: 2m
+          labels:
+            severity: critical
+            category: availability
+            component: health_check
+          annotations:
+            summary: "Health check is failing"
+            description: "Service health check has been failing for 2 minutes"
+        
+        # Database Security
+        - alert: DatabaseConnectionFailure
+          expr: rate(superego_db_connection_failures_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+            category: security
+            component: database
+          annotations:
+            summary: "Database connection failures detected"
+            description: "{{ $value }} database connection failures per second"
+        
+        - alert: DatabaseSlowQuery
+          expr: superego_db_query_duration_seconds{quantile="0.99"} > 5
+          for: 3m
+          labels:
+            severity: warning
+            category: performance
+            component: database
+          annotations:
+            summary: "Database queries are slow"
+            description: "99th percentile query time is {{ $value }} seconds"
+        
+        # AI Service Security
+        - alert: AIServiceTimeout
+          expr: rate(superego_ai_request_timeouts_total[5m]) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            category: performance
+            component: ai_service
+          annotations:
+            summary: "AI service timeouts detected"
+            description: "{{ $value }} AI requests per second are timing out"
+        
+        - alert: AIServiceQuotaExceeded
+          expr: rate(superego_ai_quota_exceeded_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: availability
+            component: ai_service
+          annotations:
+            summary: "AI service quota exceeded"
+            description: "AI service quota limits are being exceeded"
+
+# Grafana Dashboard Alerts
+grafana_alerts:
+  # Security overview dashboard alerts
+  security_overview:
+    - name: "Authentication Failures Spike"
+      condition: "avg() of query(A, 5m, now) > 10"
+      frequency: "30s"
+      message: "Authentication failure spike detected"
+      executionErrorState: "alerting"
+      noDataState: "no_data"
+      for: "2m"
+    
+    - name: "Unusual Geographic Access"
+      condition: "last() of query(B, 5m, now) > 0"
+      frequency: "60s" 
+      message: "Access detected from unusual geographic location"
+      executionErrorState: "alerting"
+      noDataState: "ok"
+      for: "0m"
+    
+    - name: "Security Policy Violations"
+      condition: "sum() of query(C, 5m, now) > 0"
+      frequency: "10s"
+      message: "Security policy violations detected"
+      executionErrorState: "alerting"
+      noDataState: "ok"
+      for: "0m"
+
+# Log-based Security Monitoring
+log_monitoring:
+  # Loki log alert rules
+  loki_rules:
+    - name: "Failed Authentication Attempts"
+      query: 'rate({job="superego-mcp"} |= "authentication failed" [5m])'
+      threshold: 0.1
+      duration: "2m"
+      severity: "warning"
+    
+    - name: "SQL Injection Attempts"
+      query: '{job="superego-mcp"} |~ "(?i)(union|select|insert|update|delete|drop)\\s"'
+      threshold: 0
+      duration: "0m"
+      severity: "critical"
+    
+    - name: "Command Injection Attempts"
+      query: '{job="superego-mcp"} |~ "(?i)(\\||&|;|`|\\$\\()"'
+      threshold: 0
+      duration: "0m"
+      severity: "critical"
+    
+    - name: "Sensitive Data in Logs"
+      query: '{job="superego-mcp"} |~ "(?i)(password|secret|key|token)\\s*[:=]"'
+      threshold: 0
+      duration: "0m"
+      severity: "critical"
+    
+    - name: "Error Rate Spike"
+      query: 'rate({job="superego-mcp"} |= "ERROR" [5m])'
+      threshold: 1.0
+      duration: "1m"
+      severity: "warning"
+
+# Security Event Correlation Rules
+correlation_rules:
+  # Multi-stage attack detection
+  - name: "Reconnaissance and Exploitation"
+    events:
+      - "port_scan_detected"
+      - "vulnerability_scan_detected"  
+      - "exploitation_attempt"
+    time_window: "1h"
+    threshold: 3
+    severity: "critical"
+  
+  - name: "Credential Stuffing Attack"
+    events:
+      - "multiple_failed_logins"
+      - "successful_login_after_failures"
+      - "unusual_user_agent"
+    time_window: "10m"
+    threshold: 2
+    severity: "high"
+  
+  - name: "Data Exfiltration Pattern"
+    events:
+      - "large_response_size"
+      - "repeated_data_access"
+      - "unusual_time_access"
+    time_window: "30m"
+    threshold: 2
+    severity: "critical"
+
+# Notification Configuration
+notifications:
+  # Slack notifications
+  slack:
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channels:
+      critical: "#security-alerts"
+      warning: "#monitoring"
+      info: "#system-notifications"
+    
+    # Message templates
+    templates:
+      critical: |
+        🚨 *CRITICAL SECURITY ALERT*
+        *Alert:* {{ .Alert.Name }}
+        *Description:* {{ .Alert.Description }}
+        *Severity:* {{ .Alert.Severity }}
+        *Time:* {{ .Alert.Time }}
+        *Runbook:* {{ .Alert.RunbookURL }}
+      
+      warning: |
+        ⚠️ *Security Warning*
+        *Alert:* {{ .Alert.Name }}
+        *Description:* {{ .Alert.Description }}
+        *Time:* {{ .Alert.Time }}
+  
+  # Email notifications
+  email:
+    smtp_server: "${SMTP_SERVER}"
+    smtp_port: 587
+    username: "${SMTP_USERNAME}"
+    password: "${SMTP_PASSWORD}"
+    
+    # Recipient lists
+    recipients:
+      critical: ["security-team@company.com", "on-call@company.com"]
+      warning: ["monitoring-team@company.com"]
+      info: ["ops-team@company.com"]
+    
+    # Rate limiting
+    rate_limit: "5/hour"  # Maximum 5 emails per hour per alert
+  
+  # PagerDuty integration
+  pagerduty:
+    integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+    severity_mapping:
+      critical: "error"
+      warning: "warning" 
+      info: "info"
+    
+    # Escalation policies
+    escalation:
+      critical: "P1-Security-Escalation"
+      warning: "P2-Security-Warning"
+
+# Security Metrics Collection
+metrics_collection:
+  # Custom security metrics
+  custom_metrics:
+    - name: "superego_auth_failures_total"
+      type: "counter"
+      help: "Total number of authentication failures"
+      labels: ["method", "source_ip", "user_agent"]
+    
+    - name: "superego_rate_limit_exceeded_total"
+      type: "counter"
+      help: "Total number of rate limit violations"
+      labels: ["endpoint", "source_ip", "limit_type"]
+    
+    - name: "superego_security_violations_total"
+      type: "counter"
+      help: "Total number of security policy violations"
+      labels: ["policy", "violation_type", "severity"]
+    
+    - name: "superego_request_duration_seconds"
+      type: "histogram"
+      help: "Request duration in seconds"
+      labels: ["method", "endpoint", "status_code"]
+      buckets: [0.1, 0.5, 1.0, 2.5, 5.0, 10.0]
+    
+    - name: "superego_concurrent_connections"
+      type: "gauge"
+      help: "Number of concurrent connections"
+      labels: ["connection_type"]
+  
+  # Metric retention
+  retention:
+    short_term: "7d"   # High-resolution metrics
+    medium_term: "30d" # Medium-resolution metrics
+    long_term: "1y"    # Low-resolution metrics for trends
+  
+  # Metric aggregation rules
+  aggregation:
+    - source_metric: "superego_requests_total"
+      target_metric: "superego_requests_per_minute"
+      function: "rate"
+      window: "1m"
+    
+    - source_metric: "superego_errors_total"
+      target_metric: "superego_error_rate"
+      function: "rate"
+      window: "5m"

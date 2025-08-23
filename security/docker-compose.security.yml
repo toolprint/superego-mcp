@@ -1,0 +1,306 @@
+# Security-Focused Docker Compose Override
+# Production security enhancements for Superego MCP deployment
+# Usage: docker-compose -f docker-compose.yml -f security/docker-compose.security.yml up
+
+services:
+  superego-mcp:
+    # Security enhancements
+    security_opt:
+      # Enable AppArmor/SELinux security profiles
+      - apparmor:docker-default
+      # Disable new privileges
+      - no-new-privileges:true
+    
+    # Capabilities management
+    cap_drop:
+      - ALL  # Drop all capabilities by default
+    cap_add:
+      - NET_BIND_SERVICE  # Only add necessary capabilities
+      - SETGID
+      - SETUID
+    
+    # User namespace remapping
+    user: "1000:1000"  # Run as non-root user
+    
+    # Read-only root filesystem
+    read_only: true
+    
+    # Temporary filesystems for writable areas
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /var/tmp:noexec,nosuid,size=50m
+      - /run:noexec,nosuid,size=50m
+    
+    # Additional volume mounts for writable areas
+    volumes:
+      # Override original volumes with specific security options
+      - superego-config:/app/data:rw,noexec,nosuid
+      - superego-logs:/app/logs:rw,noexec,nosuid
+      
+      # Configuration files (read-only)
+      - ${SUPEREGO_CONFIG_FILE:-./config/server.yaml}:/app/data/server.yaml:ro,noexec,nosuid
+      - ${SUPEREGO_RULES_FILE:-./config/rules.yaml}:/app/data/rules.yaml:ro,noexec,nosuid
+      
+      # TLS certificates (read-only, strict permissions)
+      - ${SUPEREGO_TLS_CERT:-/dev/null}:/app/certs/server.crt:ro,noexec,nosuid
+      - ${SUPEREGO_TLS_KEY:-/dev/null}:/app/certs/server.key:ro,noexec,nosuid
+    
+    # Environment variable security
+    environment:
+      # Security headers
+      - SUPEREGO_SECURITY_HEADERS_ENABLED=true
+      - SUPEREGO_REQUEST_ID_ENABLED=true
+      
+      # Disable debug features
+      - SUPEREGO_DEBUG=false
+      - SUPEREGO_HOT_RELOAD=false
+      - PYTHONDEBUG=0
+      
+      # Enhanced logging for security
+      - SUPEREGO_AUDIT_ENABLED=true
+      - SUPEREGO_LOG_STRUCTURED=true
+      
+      # Memory protection
+      - PYTHONHASHSEED=0
+      - PYTHONFAULTHANDLER=1
+      - PYTHONMALLOC=debug
+    
+    # Resource limits (strict)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'        # Reduced CPU limit
+          memory: 1G         # Reduced memory limit  
+          pids: 100          # Limit number of processes
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    # Enhanced health check
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sf http://localhost:8000/health && ps aux | grep -v grep | grep -q superego"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    
+    # Logging security
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"     # Reduced log size
+        max-file: "3"       # Fewer log files
+        labels: "service,environment,security"
+        tag: "{{.ImageName}}/{{.Name}}/{{.ID}}"
+    
+    # Additional labels for security monitoring
+    labels:
+      - "security.scan.enable=true"
+      - "security.profile=production"
+      - "security.user=non-root"
+      - "security.readonly=true"
+
+  redis:
+    # Redis security enhancements
+    security_opt:
+      - apparmor:docker-default
+      - no-new-privileges:true
+    
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+    
+    # Non-root user
+    user: "999:999"  # Redis user
+    
+    # Read-only root filesystem
+    read_only: true
+    
+    # Temporary filesystems
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m
+    
+    # Enhanced Redis configuration
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --requirepass ${REDIS_PASSWORD:-secure_redis_password}
+      --rename-command FLUSHDB ""
+      --rename-command FLUSHALL ""
+      --rename-command DEBUG ""
+      --rename-command CONFIG ""
+      --rename-command SHUTDOWN SHUTDOWN_REDIS
+    
+    # Volume security
+    volumes:
+      - redis-data:/data:rw,noexec,nosuid
+      - ${REDIS_CONFIG_FILE:-/dev/null}:/usr/local/etc/redis/redis.conf:ro,noexec,nosuid
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+          pids: 50
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    
+    labels:
+      - "security.scan.enable=true"
+      - "security.profile=production"
+      - "security.user=non-root"
+
+  nginx:
+    # Nginx security enhancements
+    security_opt:
+      - apparmor:docker-default
+      - no-new-privileges:true
+    
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETGID
+      - SETUID
+    
+    # Read-only root filesystem
+    read_only: true
+    
+    # Temporary filesystems
+    tmpfs:
+      - /var/cache/nginx:noexec,nosuid,size=100m
+      - /var/run:noexec,nosuid,size=50m
+      - /tmp:noexec,nosuid,size=50m
+    
+    # Volume security
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro,noexec,nosuid
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro,noexec,nosuid
+      - ./nginx/ssl:/etc/nginx/ssl:ro,noexec,nosuid
+      - nginx-logs:/var/log/nginx:rw,noexec,nosuid
+    
+    # Enhanced environment
+    environment:
+      - NGINX_WORKER_PROCESSES=1
+      - NGINX_WORKER_CONNECTIONS=512  # Reduced connections
+      - NGINX_KEEPALIVE_TIMEOUT=30
+      - NGINX_CLIENT_MAX_BODY_SIZE=1m
+      - NGINX_RATE_LIMIT=true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+          pids: 50
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    
+    labels:
+      - "security.scan.enable=true"
+      - "security.profile=production"
+      - "security.user=root"  # Nginx needs root for port binding
+      - "security.readonly=true"
+
+  # Security monitoring container
+  security-monitor:
+    image: aquasec/trivy:latest
+    container_name: superego-security-monitor
+    restart: unless-stopped
+    
+    # Security configuration
+    security_opt:
+      - apparmor:docker-default
+      - no-new-privileges:true
+    
+    cap_drop:
+      - ALL
+    
+    user: "1000:1000"
+    read_only: true
+    
+    # Mount Docker socket for container scanning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - security-reports:/reports:rw,noexec,nosuid
+      - ./trivy.yaml:/etc/trivy/trivy.yaml:ro
+    
+    # Scan command
+    command: >
+      sh -c '
+        while true; do
+          echo "Running security scan..."
+          trivy image --config /etc/trivy/trivy.yaml --format json --output /reports/scan-$(date +%Y%m%d-%H%M%S).json superego-mcp:latest
+          sleep 3600  # Run every hour
+        done
+      '
+    
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+          pids: 50
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    
+    networks:
+      - monitoring
+    
+    labels:
+      - "service=security-monitor"
+      - "environment=production"
+      - "component=security"
+    
+    profiles: ["security", "full"]
+
+# Additional security volumes
+volumes:
+  security-reports:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/security/reports
+      o: bind
+
+# Network security enhancements
+networks:
+  superego-prod:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"  # Disable inter-container communication
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.driver.mtu: "1500"
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
+    
+  monitoring:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.driver.mtu: "1500"
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+          gateway: 172.21.0.1

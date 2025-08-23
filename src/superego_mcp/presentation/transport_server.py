@@ -170,7 +170,7 @@ class MultiTransportServer:
             """
             return {
                 "name": "superego-mcp",
-                "version": "0.1.0",
+                "version": "0.0.0",
                 "description": "Intelligent tool request interception for AI agents",
                 "transports": self._get_enabled_transports(),
                 "config": {
