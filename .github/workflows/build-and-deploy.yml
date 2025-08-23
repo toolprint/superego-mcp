@@ -165,7 +165,7 @@ jobs:
       with:
         context: .
         file: ./docker/production/Dockerfile
-        platforms: ${{ github.event_name != 'pull_request' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+        platforms: linux/amd64
         push: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.force_publish) }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -184,11 +184,11 @@ jobs:
     - name: Add build summary
       if: github.event_name != 'pull_request'
       run: |
-        echo "## 🚀 Multi-Platform Build Completed" >> $GITHUB_STEP_SUMMARY
+        echo "## 🚀 Container Build Completed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-        echo "- **Build Strategy**: Optimized cross-compilation (6-10x faster)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Cache Strategy**: Unified multi-platform cache" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms**: linux/amd64" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Strategy**: Native AMD64 build" >> $GITHUB_STEP_SUMMARY
+        echo "- **Cache Strategy**: GitHub Actions cache" >> $GITHUB_STEP_SUMMARY
         echo "- **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Digest**: ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
 
@@ -353,7 +353,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "## Container Image" >> $GITHUB_STEP_SUMMARY
         echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms**: linux/amd64" >> $GITHUB_STEP_SUMMARY
         echo "- **Registry**: ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "## Build Status" >> $GITHUB_STEP_SUMMARY
