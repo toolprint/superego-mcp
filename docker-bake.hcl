@@ -74,6 +74,12 @@ function "tags" {
   ]
 }
 
+# Function to filter empty strings from a list
+function "filter_empty" {
+  params = [list]
+  result = [for item in list : item if item != ""]
+}
+
 # Environment variable for Docker Metadata tags (when set by CI)
 variable "DOCKER_METADATA_TAGS" {
   default = ""
@@ -124,7 +130,8 @@ target "production" {
   platforms = split(",", PLATFORMS)
   
   # Image tags - use metadata tags from CI if available, otherwise use function
-  tags = DOCKER_METADATA_TAGS != "" ? split(",", DOCKER_METADATA_TAGS) : tags(IMAGE_NAME, TAG, VERSION)
+  # Docker metadata action outputs newline-separated tags, so split by newline and filter empty strings
+  tags = DOCKER_METADATA_TAGS != "" ? filter_empty(split("\n", DOCKER_METADATA_TAGS)) : tags(IMAGE_NAME, TAG, VERSION)
   
   # Build arguments optimized for cross-compilation
   args = {
