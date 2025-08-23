@@ -165,14 +165,14 @@ jobs:
         cache-from: |
           type=gha,scope=multiarch-deps
           type=gha,scope=multiarch-runtime
-          type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache
+          ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}/{1}:cache', env.REGISTRY, env.IMAGE_NAME) || '' }}
         cache-to: |
           type=gha,scope=multiarch-deps,mode=max
           type=gha,scope=multiarch-runtime,mode=max
-          type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache,mode=max
+          ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}/{1}:cache,mode=max', env.REGISTRY, env.IMAGE_NAME) || '' }}
         provenance: true
         sbom: true
-        outputs: type=registry,push=${{ github.event_name != 'pull_request' }}
+        outputs: ${{ github.event_name != 'pull_request' && 'type=registry' || 'type=docker' }}
     
     - name: Add build summary
       if: github.event_name != 'pull_request'
