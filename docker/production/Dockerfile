@@ -55,6 +55,7 @@ RUN --mount=type=cache,target=/root/.npm \
 # Copy project files
 COPY pyproject.toml uv.lock hatch_build.py ./
 COPY src/ ./src/
+COPY config/ ./config/
 COPY README.md ./
 
 # Create virtual environment with UV cache mount optimization
@@ -147,6 +148,9 @@ RUN --mount=type=cache,target=/root/.npm \
 # Copy the built wheel and install it
 COPY --from=builder /build/dist/*.whl /tmp/
 RUN uv pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
+
+# Copy configuration files
+COPY --from=builder /build/config/ ./config/
 
 # Copy entrypoint script
 COPY docker/production/docker-entrypoint.sh ./
