@@ -122,17 +122,6 @@ ignore:
   # Use .trivyignore file for vulnerability exceptions
   ignorefile: .trivyignore
 
-# Report configuration  
-report:
-  # Summary format
-  summary: true
-  
-  # Include dependency paths
-  dependency-tree: true
-  
-  # List all packages (including those without vulnerabilities)
-  list-all-pkgs: false
-
 # Integration settings
 integration:
   # GitHub Security Advisory integration
