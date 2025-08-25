@@ -8,13 +8,16 @@ dynamic = ["version"]
 description = "Intelligent tool-call review system for AI agents"
 requires-python = ">=3.11"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Brian Cripe", email = "brian@onegrep.dev" },
 ]
 keywords = [
-    "ai",
     "mcp",
+    "ai",
+    "agent",
+    "llm",
+    "toolprint",
     "security", 
     "tool-filtering",
     "claude-code",
@@ -379,10 +382,12 @@ exclude_lines = [
 
 [dependency-groups]
 dev = [
+    "build>=1.3.0",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "pytest-cov>=6.2.1",
     "pytest-timeout>=2.4.0",
+    "twine>=6.1.0",
     "types-psutil>=7.0.0.20250801",
     "types-python-dateutil>=2.9.0.20250809",
 ]

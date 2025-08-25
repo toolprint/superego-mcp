@@ -143,3 +143,171 @@ homebrew-formula: build
     echo 'end' >> superego.rb
     
     just _success "Homebrew formula generated: superego.rb"
+
+# =============================================================================
+# PYPI PUBLISHING
+# =============================================================================
+
+# Validate package is ready for PyPI publishing
+[group: 'publish']
+pypi-check:
+    #!/usr/bin/env bash
+    just _info "Validating PyPI publishing requirements..."
+    
+    # Check if twine is available
+    if ! command -v {{_uv}} run twine >/dev/null 2>&1; then
+        just _error "twine" "twine not found. Run: {{_uv}} add --dev twine"
+    fi
+    
+    # Check if .pypirc exists
+    if [ ! -f ~/.pypirc ]; then
+        just _error "credentials" "~/.pypirc not found. Create it with your PyPI API token"
+    fi
+    
+    # Check if dist/ has distributions
+    if [ ! -d "dist" ] || [ -z "$(ls -A dist/ 2>/dev/null)" ]; then
+        just _info "No distributions found. Building..."
+        just build
+    fi
+    
+    # Validate distributions
+    just _run "Validating distributions" "{{_uv}} run twine check dist/*"
+    
+    # Check if version already exists on PyPI (optional warning)
+    VERSION=$(just _version)
+    if {{_uv}} run python -c "import requests; r=requests.get('https://pypi.org/pypi/superego-mcp/$VERSION/json'); exit(0 if r.status_code==404 else 1)" >/dev/null 2>&1; then
+        just _info "Version $VERSION not found on PyPI (good to publish)"
+    else
+        just _warn "Version $VERSION may already exist on PyPI"
+    fi
+    
+    just _success "PyPI publishing validation complete!"
+
+# Clean build for PyPI (ensures fresh distributions)
+[group: 'publish']
+pypi-build: clean
+    #!/usr/bin/env bash
+    just _info "Building fresh distributions for PyPI..."
+    just _run "Building wheel and source distribution" "{{_uv}} run python -m build"
+    just _run "Validating distributions" "{{_uv}} run twine check dist/*"
+    
+    # Show what was built
+    echo ""
+    just _info "Built distributions:"
+    ls -la dist/
+    just _success "PyPI build complete!"
+
+# Publish to TestPyPI for testing
+[group: 'publish']
+pypi-test: pypi-build
+    #!/usr/bin/env bash
+    just _info "Publishing to TestPyPI..."
+    
+    if ! grep -q "testpypi" ~/.pypirc; then
+        just _error "credentials" "TestPyPI configuration not found in ~/.pypirc"
+    fi
+    
+    just _run "Uploading to TestPyPI" "{{_uv}} run twine upload --repository testpypi dist/*"
+    
+    VERSION=$(just _version)
+    echo ""
+    just _success "Published to TestPyPI!"
+    just _info "Test installation with:"
+    echo "  {{_uv}} pip install --index-url https://test.pypi.org/simple/ superego-mcp==$VERSION"
+
+# Publish to PyPI (production)
+[group: 'publish']
+pypi-publish: pypi-check
+    #!/usr/bin/env bash
+    VERSION=$(just _version)
+    PACKAGE_NAME="superego-mcp"
+    
+    echo "🚀 Ready to publish $PACKAGE_NAME version $VERSION to PyPI"
+    echo ""
+    echo "This will:"
+    echo "  - Upload to the official PyPI repository"
+    echo "  - Make the package publicly available"
+    echo "  - Create git tag v$VERSION"
+    echo ""
+    
+    # Interactive confirmation
+    read -p "Continue with PyPI publish? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Publish cancelled"
+        exit 1
+    fi
+    
+    just _run "Uploading to PyPI" "{{_uv}} run twine upload dist/*"
+    
+    # Create git tag after successful upload
+    if git tag -a "v$VERSION" -m "Release version $VERSION"; then
+        just _run "Pushing git tag" "git push origin v$VERSION"
+        just _success "Git tag v$VERSION created and pushed"
+    else
+        just _warn "Failed to create git tag (may already exist)"
+    fi
+    
+    echo ""
+    just _success "Successfully published $PACKAGE_NAME $VERSION to PyPI!"
+    just _info "Package available at: https://pypi.org/project/$PACKAGE_NAME/$VERSION/"
+    just _info "Install with: pip install $PACKAGE_NAME"
+
+# Complete release workflow
+[group: 'publish']
+pypi-release: check pypi-publish
+    #!/usr/bin/env bash
+    VERSION=$(just _version)
+    just _success "Release $VERSION completed successfully!"
+    echo ""
+    echo "📦 Package: https://pypi.org/project/superego-mcp/$VERSION/"
+    echo "🏷️  Git tag: v$VERSION"
+    echo "💾 Install: pip install superego-mcp"
+
+# Show PyPI publishing status
+[group: 'publish']
+pypi-status:
+    #!/usr/bin/env bash
+    just _info "PyPI Publishing Status"
+    echo "======================="
+    echo ""
+    
+    VERSION=$(just _version)
+    echo "📦 Current version: $VERSION"
+    
+    # Check twine
+    if command -v {{_uv}} run twine >/dev/null 2>&1; then
+        echo "✅ twine: Available"
+    else
+        echo "❌ twine: Not found (run: {{_uv}} add --dev twine)"
+    fi
+    
+    # Check .pypirc
+    if [ -f ~/.pypirc ]; then
+        echo "✅ credentials: ~/.pypirc exists"
+        if grep -q "pypi" ~/.pypirc; then
+            echo "  - PyPI configuration found"
+        fi
+        if grep -q "testpypi" ~/.pypirc; then
+            echo "  - TestPyPI configuration found"
+        fi
+    else
+        echo "❌ credentials: ~/.pypirc not found"
+    fi
+    
+    # Check distributions
+    if [ -d "dist" ] && [ -n "$(ls -A dist/ 2>/dev/null)" ]; then
+        echo "✅ distributions: Available in dist/"
+        ls -la dist/
+    else
+        echo "❌ distributions: None found (run: just pypi-build)"
+    fi
+    
+    # Check if published
+    echo ""
+    echo "🔍 Checking PyPI status..."
+    if {{_uv}} run python -c "import requests; r=requests.get('https://pypi.org/pypi/superego-mcp/json'); print('✅ Package exists on PyPI') if r.status_code==200 else print('📦 Package not yet on PyPI')" 2>/dev/null; then
+        :
+    else
+        echo "❓ Unable to check PyPI status"
+    fi

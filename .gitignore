@@ -96,6 +96,9 @@ target/
 *.o
 *.dylib
 *.exe
+build_report.json
+_build_metadata.json
+_asset_checksums.json
 
 # Environment files (additional patterns)
 .env.local
@@ -106,3 +109,7 @@ target/
 # Simple Task Master - User tasks are git-ignored
 .simple-task-master/tasks/
 .simple-task-master/lock
+
+# Codanna
+.codanna/
+.fastembed_cache
